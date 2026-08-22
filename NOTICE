@@ -1,0 +1,6 @@
+recall
+Copyright 2026 Terry Frank
+
+Architecture and hook design informed by claude-mem by Alex Newman
+(https://github.com/thedotmack/claude-mem), Apache License 2.0.
+This is an independent reimplementation; no upstream source is included.

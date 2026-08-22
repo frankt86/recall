@@ -1,0 +1,26 @@
+{
+  "name": "recall",
+  "version": "0.1.0",
+  "description": "Daemonless persistent memory for Claude Code. SQLite is the bus, no ports, no worker.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "recall": "./src/cli.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "process": "bun src/processor.ts",
+    "ui": "bun src/cli.ts ui",
+    "export": "bun src/cli.ts export"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.24.0"
+  },
+  "optionalDependencies": {
+    "@huggingface/transformers": "^3.5.0"
+  },
+  "engines": {
+    "bun": ">=1.1.0"
+  }
+}

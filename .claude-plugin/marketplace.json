@@ -1,0 +1,16 @@
+{
+  "name": "memory-tools",
+  "owner": {
+    "name": "Terry Frank"
+  },
+  "plugins": [
+    {
+      "name": "recall",
+      "source": "./",
+      "description": "Daemonless persistent memory for Claude Code",
+      "skills": [
+        "./skills"
+      ]
+    }
+  ]
+}

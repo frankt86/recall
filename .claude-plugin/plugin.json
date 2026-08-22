@@ -1,0 +1,9 @@
+{
+  "name": "recall",
+  "version": "0.1.0",
+  "description": "Daemonless persistent memory for Claude Code",
+  "author": {
+    "name": "Terry Frank"
+  },
+  "license": "Apache-2.0"
+}
