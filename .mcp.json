@@ -4,7 +4,7 @@
       "type": "stdio",
       "command": "bun",
       "args": [
-        "${CLAUDE_PLUGIN_ROOT}/src/mcp.ts"
+        "${CLAUDE_PLUGIN_ROOT}/src/mcp-launch.ts"
       ]
     }
   }
