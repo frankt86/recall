@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { existsSync } from "node:fs";
 import { openDb } from "../db";
 import { COMPILED, embeddingsAvailable } from "../embed";
@@ -10,7 +11,10 @@ export interface Check { name: string; ok: boolean; detail: string; warn?: boole
 
 export async function runChecks(): Promise<Check[]> {
   const checks: Check[] = [];
-  checks.push({ name: "bun", ok: true, detail: Bun.version });
+  checks.push({ name: "bun", ok: true, detail: `${Bun.version} (${process.execPath})` });
+  const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT || join(import.meta.dir, "..", "..");
+  const mirror = join(pluginRoot, "runtime", process.platform === "win32" ? "bun.exe" : "bun");
+  checks.push({ name: "runtime", ok: true, warn: !existsSync(mirror), detail: existsSync(mirror) ? mirror : `${mirror} missing; MCP server cannot start until a hook runs (bash bin/bun.sh --ensure)` });
   checks.push({ name: "data dir", ok: existsSync(dataDir()), detail: dataDir() });
   let s;
   try {

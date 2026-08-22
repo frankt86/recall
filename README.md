@@ -13,6 +13,12 @@ Persistent memory for Claude Code with no daemon, no port, no Python, no Chroma.
 
 Runtime dependencies: `bun`, `@modelcontextprotocol/sdk`, `zod`. `@huggingface/transformers` is optional.
 
+## Prerequisites
+
+- **Claude Code** (it runs hooks under bash: Git for Windows on Windows, nothing extra elsewhere).
+- **An LLM**: the `claude` CLI is used by default; set `ANTHROPIC_API_KEY` to call the API directly instead.
+- **Bun is installed for you.** Nothing else is required up front; see "Runtime" below.
+
 ## Install
 
 ```
@@ -26,7 +32,19 @@ or point Claude Code at the directory:
 claude --plugin-dir /path/to/recall
 ```
 
-The Setup hook runs `bun install` and `doctor`. Restart Claude Code.
+The Setup hook bootstraps the runtime, runs `bun install`, then `doctor`. Restart Claude Code.
+
+## Runtime
+
+Everything (hooks, MCP server, CLI) runs on Bun. `bin/bun.sh` resolves one without a remote install script and without touching PATH or shell profiles, in this order:
+
+1. `RECALL_BUN` (explicit override)
+2. `<plugin>/runtime/bun` — a private copy the MCP server launches directly
+3. `~/.recall/runtime/bun-v<pinned>/bun` — cache that survives plugin updates
+4. `bun` on PATH (or `~/.bun/bin`) if it is >= 1.1
+5. Download the pinned release zip from GitHub, verify its SHA-256 against checksums embedded in the script, and install into 3
+
+Installs are atomic and locked against concurrently firing hooks. Set `RECALL_NO_DOWNLOAD=1` to fail instead of downloading, `RECALL_BUN_TARGET` to override platform detection (e.g. `linux-x64-baseline`). `recall doctor` reports which Bun is in use. With `--plugin-dir` (no Setup hook) the MCP server starts on the second session, after the first session's hooks have populated `runtime/`; run `bash bin/bun.sh --ensure` to do it immediately.
 
 ## How it runs
 
