@@ -26,7 +26,7 @@ function help(): string {
     ...COMMANDS.map((c) => `  ${c.name.padEnd(w)}${c.summary}`),
     "",
     "  recall <command> --help   options for a command",
-    "  env: RECALL_DIR, RECALL_MODEL, RECALL_LLM=auto|api|cli|fake, RECALL_EMBEDDINGS=0, RECALL_DEBUG=1  (CLAUDE_MEM_* still accepted)",
+    "  env: RECALL_DIR, RECALL_MODEL, RECALL_LLM=auto|api|cli|fake, RECALL_EMBEDDINGS=0, RECALL_DEBUG=1",
   ].join("\n");
 }
 

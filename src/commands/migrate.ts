@@ -1,8 +1,6 @@
 import { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import { floatsToBlob, now, openDb } from "../db";
 import { embed } from "../embed";
 import type { CommandSpec } from "./args";
@@ -80,7 +78,7 @@ async function runMigrate(src: string): Promise<void> {
 
 export const migrate: CommandSpec<{ from?: string }> = {
   name: "migrate",
-  summary: "import observations/summaries from claude-mem's claude-mem.db",
-  options: { from: { type: "string", help: "path to legacy db", default: join(homedir(), ".claude-mem", "claude-mem.db") } },
+  summary: "one-time import from the third-party claude-mem plugin",
+  options: { from: { type: "string", help: "path to the claude-mem sqlite file", required: true } },
   run: (o) => runMigrate(o.from!),
 };

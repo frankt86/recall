@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -44,27 +44,14 @@ export const DEFAULTS: Settings = {
   ],
 };
 
-/** Read RECALL_<name>, falling back to the pre-rename CLAUDE_MEM_<name>. */
+/** Read the RECALL_<name> environment variable. */
 export function env(name: string): string | undefined {
-  return process.env[`RECALL_${name}`] ?? process.env[`CLAUDE_MEM_${name}`];
+  return process.env[`RECALL_${name}`];
 }
-
-export const LEGACY_DIR = join(homedir(), ".claude-mem-lite");
 
 export function dataDir(): string {
   const d = env("DIR") || join(homedir(), ".recall");
-  if (!existsSync(d)) {
-    // one-time move of a pre-rename data dir so existing memory is kept
-    if (!env("DIR") && existsSync(LEGACY_DIR)) {
-      try {
-        renameSync(LEGACY_DIR, d);
-      } catch {
-        // rename fails across volumes or while the old db is open; copy instead and leave the original in place
-        try { cpSync(LEGACY_DIR, d, { recursive: true }); } catch { /* fall through to fresh dir */ }
-      }
-    }
-    if (!existsSync(d)) mkdirSync(d, { recursive: true });
-  }
+  if (!existsSync(d)) mkdirSync(d, { recursive: true });
   return d;
 }
 

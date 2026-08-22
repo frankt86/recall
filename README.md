@@ -2,20 +2,14 @@
 
 Persistent memory for Claude Code with no daemon, no port, no Python, no Chroma. One SQLite file is the entire system.
 
-## What changed versus claude-mem
+## Design
 
-| | claude-mem | recall |
-|---|---|---|
-| IPC | HTTP worker on 377xx, Bun process manager, PID file | SQLite job table, hooks write rows, a short-lived processor drains and exits |
-| Observation grain | one LLM call per tool use | one LLM call per user prompt, events batched |
-| LLM call | Agent SDK session per observation | plain Messages API, or `claude -p` on your subscription if no API key |
-| Vectors | Chroma via uvx (second daemon) | bge-small in-process via transformers.js, cosine over BLOBs; falls back to FTS5 only |
-| Context injection | last N summaries | hybrid FTS5 + vector RRF, recency half-life, Beta confidence, token budget, query built from branch and recently modified files |
-| Decay | none | nightly digest of observations older than 30 days; originals archived, still searchable |
-| Privacy | opt-in `<private>` tags | secret redaction on by default, `.env` / key / credential paths never captured, `<private>` still honored |
-| Project identity | directory name | sha1 of normalized git remote, path fallback; worktrees and clones share memory |
-| Windows | uid math, PID files, detached POSIX assumptions | lock is a SQLite row with expiry; spawn is `bun` with unref |
-| Portability | 22 REST endpoints | `export` writes Logseq-friendly markdown per project |
+- **No daemon, no port.** Hooks write rows to one SQLite file; a short-lived processor drains the job queue and exits. A lock row with expiry replaces PID files, so it behaves the same on Windows.
+- **One LLM call per prompt.** Tool events are batched per user prompt and turned into 1–4 observations; sessions get a summary; observations older than 30 days are folded into a project digest and archived (still searchable).
+- **Hybrid retrieval.** FTS5 + in-process bge-small vectors fused with RRF, recency half-life, Beta-distribution confidence, and a token budget. Falls back to FTS5 alone if embeddings are unavailable.
+- **Private by default.** Secret redaction, `.env`/key/credential paths never captured, `<private>` tags honoured.
+- **Project identity** is the sha1 of the normalised git remote (path fallback), so worktrees and clones share memory.
+- **Portable.** `recall export` writes Logseq-friendly markdown per project.
 
 Runtime dependencies: `bun`, `@modelcontextprotocol/sdk`, `zod`. `@huggingface/transformers` is optional.
 
@@ -56,7 +50,7 @@ When the LLM call goes through `claude -p`, that child Claude Code would load th
 
 ## Settings
 
-`~/.recall/settings.json` (created on first run). Env overrides: `RECALL_DIR`, `RECALL_MODEL`, `RECALL_LLM` (`auto|api|cli|fake`), `RECALL_EMBEDDINGS=0`, `RECALL_DEBUG=1`. The older `CLAUDE_MEM_*` names are still accepted, and an existing `~/.claude-mem-lite` data dir is moved (or copied, if locked) to `~/.recall` on first run.
+`~/.recall/settings.json` (created on first run). Env overrides: `RECALL_DIR`, `RECALL_MODEL`, `RECALL_LLM` (`auto|api|cli|fake`), `RECALL_EMBEDDINGS=0`, `RECALL_DEBUG=1`.
 
 With `ANTHROPIC_API_KEY` set the processor calls the Messages API with Haiku. Without it, `claude -p --model <model>` is used, which bills your Claude subscription and needs no key.
 
@@ -68,7 +62,7 @@ With `ANTHROPIC_API_KEY` set the processor calls the Messages API with Haiku. Wi
 recall status [--json]                   counts, queue, stuck/failed jobs, projects
 recall process [--dry-run] [--max N] [--retry]
 recall export [--out dir] [--project name]
-recall migrate [--from ~/.claude-mem/claude-mem.db]
+recall migrate --from <path to a claude-mem db>
 recall relink --legacy <name> --remote <git url>
 recall consolidate [--now]
 recall ui [--port n] [--open]            local viewer, exits with the process
