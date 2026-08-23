@@ -8,7 +8,7 @@ import { join } from "node:path";
 test("mcp launcher bootstraps node_modules from a bare checkout", async () => {
   const dir = join(tmpdir(), "recall-bare-" + process.pid);
   mkdirSync(dir, { recursive: true });
-  for (const f of ["src", "package.json", "bun.lock"]) cpSync(f, join(dir, f), { recursive: true });
+  for (const f of ["src", "package.json", "bun.lock"]) if (existsSync(f)) cpSync(f, join(dir, f), { recursive: true }); // bun.lock is gitignored, so CI checkouts lack it
   expect(existsSync(join(dir, "node_modules"))).toBe(false);
 
   const msgs = [
