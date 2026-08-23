@@ -1,1 +1,29 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><title>recall</title><style>:root{color-scheme:light dark}@media(prefers-color-scheme:dark){:root{}}</style></head><body>placeholder</body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>recall</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <span class="brand">recall<small id="brand-sub"></small></span>
+    <input id="q" placeholder="search memory  —  press /" autocomplete="off" spellcheck="false">
+    <select id="type" title="type"><option value="">all types</option></select>
+    <select id="sort" title="sort"><option value="created">newest</option><option value="confidence">confidence</option></select>
+    <button id="new" class="primary" title="new memory (n)">+ New</button>
+    <button id="help" class="sm" title="keyboard help (?)">?</button>
+  </header>
+  <div class="body" id="body">
+    <aside id="side"></aside>
+    <main id="main"></main>
+    <section class="pane" id="pane"></section>
+  </div>
+</div>
+<div class="toasts" id="toasts"></div>
+<div id="overlay"></div>
+<script type="module" src="/static/app.js"></script>
+</body>
+</html>

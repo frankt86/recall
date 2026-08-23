@@ -119,6 +119,7 @@ export function registerObservationRoutes(r: Router): void {
     void cur;
     return json(obsOut(getObs(db, id)));
   };
+  r.get("/api/observations/:id", ({ db, params }) => json(obsOut(getObs(db, intParam(params.id)))));
   r.patch("/api/observations/:id", patch);
 
   r.delete("/api/observations/:id", ({ db, params }) => {

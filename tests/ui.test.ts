@@ -36,7 +36,7 @@ test("index html is served and dark-mode aware", async () => {
   const r = await fetch(base + "/");
   expect(r.headers.get("content-type")).toContain("text/html");
   const t = await r.text();
-  expect(t).toContain("prefers-color-scheme");
+  expect(t).toContain('<link rel="stylesheet" href="/static/app.css">');
   expect(t).not.toContain("<script src=\"http");
 });
 
@@ -106,3 +106,28 @@ test("edit observation title/narrative/facts and reindex fts", async () => {
   expect(bad.status).toBe(400);
 });
 
+
+test("static SPA assets are served with correct types; traversal is refused", async () => {
+  const html = await fetch(base + "/");
+  expect(html.headers.get("content-type")).toContain("text/html");
+  const t = await html.text();
+  expect(t).toContain('<script type="module" src="/static/app.js">');
+  for (const [p, ct] of [["/static/app.js", "text/javascript"], ["/static/app.css", "text/css"], ["/static/keys.js", "text/javascript"], ["/static/views/preview.js", "text/javascript"], ["/static/views/jobs.js", "text/javascript"], ["/static/views/health.js", "text/javascript"], ["/static/views/sessions.js", "text/javascript"]]) {
+    const r = await fetch(base + p);
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toContain(ct);
+  }
+  const css = await (await fetch(base + "/static/app.css")).text();
+  expect(css).toContain("prefers-color-scheme: dark");
+  expect((await fetch(base + "/static/../package.json")).status).toBe(404);
+  expect((await fetch(base + "/static/views/../../package.json")).status).toBe(404);
+  expect((await fetch(base + "/static/nope.js")).status).toBe(404);
+});
+
+test("every static module parses as JS", async () => {
+  for (const p of ["app.js", "keys.js", "views/preview.js", "views/jobs.js", "views/health.js", "views/sessions.js"]) {
+    const src = await (await fetch(base + "/static/" + p)).text();
+    const t = Bun.Transpiler ? new Bun.Transpiler({ loader: "js" }) : null;
+    expect(() => t!.transformSync(src)).not.toThrow();
+  }
+});
