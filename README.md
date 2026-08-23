@@ -119,6 +119,10 @@ Memory rots in two ways: facts go stale (the code changed, the decision was reve
 
 **At read time — relevance gate.** With a real query, only three items that matched by recency alone are allowed in; the rest must have a keyword, semantic, or graph hit. A session with little relevant memory injects less, not the same 2.5k tokens of filler. Every injection also costs an item a little confidence (`beta`) unless it is later marked useful, so memory that keeps being shown without helping sinks.
 
+**When the same thing keeps breaking — lessons.** Bugfix observations that share an entity (a file, command, or symbol) across `recurringThreshold` (3) separate sessions mean the fix is not sticking. The model is asked to write one durable lesson from those fixes — what breaks, why, the rule — and it is stored as a **pinned** `lesson` memory with importance 5, so it is injected every session from then on. One lesson per entity, rewritten as the count grows; never auto-retired. Runs right after each bugfix is observed and in maintenance.
+
+**Importance.** The extractor rates each observation 1–5 (5 = architectural decision, standing rule, root cause; 1 = trivia). Retrieval ranks by relevance × recency × confidence × importance, after the Generative Agents memory model, so a decision outranks a same-day note about a typo.
+
 **Periodically — `maintain` job**, run with the processor every `maintainEveryHours` (12) and triggerable from the UI:
 
 - **Retire** — after `retireAfterDays` (45), observations that were injected 3+ times but never marked useful, or whose confidence fell below 40 %, are archived.

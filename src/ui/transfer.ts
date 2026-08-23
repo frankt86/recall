@@ -13,7 +13,7 @@ export interface ObsIn {
   pinned: boolean;
 }
 
-export const TYPES = ["decision", "bugfix", "feature", "change", "discovery", "refactor", "config", "other", "manual"] as const;
+export const TYPES = ["decision", "bugfix", "feature", "change", "discovery", "refactor", "config", "other", "manual", "lesson"] as const;
 
 const norm = (o: Partial<ObsIn> & Record<string, unknown>): ObsIn => ({
   type: typeof o.type === "string" && o.type ? o.type : "other",

@@ -32,6 +32,7 @@ export interface ObservationRow {
   pinned: number;
   source: string;
   superseded_by: number | null;
+  importance: number;
   embedding: Uint8Array | null;
 }
 
@@ -125,6 +126,7 @@ CREATE TABLE IF NOT EXISTS observations (
   pinned INTEGER NOT NULL DEFAULT 0,
   source TEXT NOT NULL DEFAULT 'auto',
   superseded_by INTEGER,
+  importance REAL NOT NULL DEFAULT 3,
   embedding BLOB
 );
 CREATE INDEX IF NOT EXISTS idx_obs_project ON observations(project_id, archived, created_at DESC);
@@ -240,8 +242,9 @@ function migrate(db: Database): void {
   if (!cols.has("pinned")) db.exec("ALTER TABLE observations ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0");
   if (!cols.has("source")) db.exec("ALTER TABLE observations ADD COLUMN source TEXT NOT NULL DEFAULT 'auto'");
   if (!cols.has("superseded_by")) db.exec("ALTER TABLE observations ADD COLUMN superseded_by INTEGER");
+  if (!cols.has("importance")) db.exec("ALTER TABLE observations ADD COLUMN importance REAL NOT NULL DEFAULT 3");
   db.exec("CREATE INDEX IF NOT EXISTS idx_obs_pinned ON observations(project_id, pinned) WHERE pinned = 1");
-  setMeta(db, "schema_version", "3");
+  setMeta(db, "schema_version", "4");
 }
 
 export function closeDb(): void {

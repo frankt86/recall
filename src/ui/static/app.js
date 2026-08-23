@@ -6,7 +6,7 @@ import * as health from "./views/health.js";
 import * as sessions from "./views/sessions.js";
 import * as graph from "./views/graph.js";
 
-export const TYPES = ["decision", "bugfix", "feature", "change", "discovery", "refactor", "config", "other", "manual"];
+export const TYPES = ["decision", "bugfix", "feature", "change", "discovery", "refactor", "config", "other", "manual", "lesson"];
 export const VIEWS = {
   inbox: { label: "Inbox", key: "i", list: true },
   all: { label: "All memory", key: "a", list: true },
@@ -370,6 +370,7 @@ export function renderPane() {
       <dl><dt>id</dt><dd>#${o.id}</dd><dt>project</dt><dd>${esc(S.projects.find((p) => p.id === o.project_id)?.name || o.project_id)}</dd>
         <dt>created</dt><dd>${fmtDate(o.created_at)}</dd>
         <dt>confidence</dt><dd><span class="conf"><i style="width:${(o.confidence * 100).toFixed(0)}%"></i></span> ${(o.confidence * 100).toFixed(0)}% <span class="muted">(α ${o.alpha?.toFixed(1)} β ${o.beta?.toFixed(1)})</span></dd>
+        <dt>importance</dt><dd>${"●".repeat(Math.round(o.importance || 3))}${"○".repeat(5 - Math.round(o.importance || 3))} <span class="muted">${o.importance || 3}/5</span></dd>
         <dt>embedding</dt><dd>${o.embedded ? "yes" : '<span class="muted">pending</span>'}</dd></dl>
       <div class="toggles"><button class="sm" id="p-up" title="f">👍 useful</button><button class="sm" id="p-down" title="F">👎 not useful</button></div>
     </div>`;
@@ -385,6 +386,7 @@ export function whyChips(w) {
   if (w.vec) c.push(`semantic #${w.vec}`);
   if (w.recent) c.push(`recent #${w.recent}`);
   c.push(`recency ×${(0.5 + 0.5 * w.recency).toFixed(2)}`, `confidence ×${(0.5 + w.confidence).toFixed(2)}`);
+  if (w.importance) c.push(`importance ×${(0.7 + 0.1 * w.importance).toFixed(2)}`);
   return c.map((x) => `<span class="chip">${x}</span>`).join("");
 }
 

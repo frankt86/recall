@@ -16,6 +16,7 @@ export interface Settings {
   maxActivePerProject: number;
   dedupeThreshold: number;
   graphEdgeDecay: number;
+  recurringThreshold: number;
   maxEventChars: number;
   maxPromptEvents: number;
   redact: boolean;
@@ -37,6 +38,7 @@ export const DEFAULTS: Settings = {
   maxActivePerProject: 400,
   dedupeThreshold: 0.92,
   graphEdgeDecay: 0.95,
+  recurringThreshold: 3,
   maxEventChars: 6000,
   maxPromptEvents: 80,
   redact: true,

@@ -83,6 +83,10 @@ function fake(system: string, user: string): string {
     const dup = user.match(/^#(\d+) .*\[dup\]/m);
     return JSON.stringify({ supersedes, duplicate_of: dup ? Number(dup[1]) : null });
   }
+  if (system.includes("LESSON_WRITER")) {
+    const ent = user.match(/^ENTITY: \S+ (.+)$/m)?.[1] ?? "thing";
+    return JSON.stringify({ title: `Recurring: ${ent} keeps breaking`, narrative: `Fake lesson about ${ent}.`, facts: ["Check memory first", "Apply the established fix"] });
+  }
   if (system.includes("SESSION_SUMMARIZER")) {
     return JSON.stringify({
       request: "Fake request",

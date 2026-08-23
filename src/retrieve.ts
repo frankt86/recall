@@ -13,6 +13,7 @@ export interface Why {
   recent?: number;
   recency: number;
   confidence: number;
+  importance?: number;
 }
 
 export interface ScoredItem {
@@ -26,6 +27,7 @@ export interface ScoredItem {
   files: string[];
   type: string;
   pinned: boolean;
+  importance: number;
   why: Why;
 }
 
@@ -86,6 +88,7 @@ function obsToItem(o: ObservationRow): ScoredItem {
     files: safeArr(o.files),
     type: o.type,
     pinned: !!o.pinned,
+    importance: o.importance ?? 3,
     why: { recency: 1, confidence: o.alpha / (o.alpha + o.beta) },
   };
 }
@@ -103,6 +106,7 @@ function sumToItem(s: SummaryRow): ScoredItem {
     files: [],
     type: "session",
     pinned: false,
+    importance: 3,
     why: { recency: 1, confidence: 0.6 },
   };
 }
@@ -224,8 +228,9 @@ export async function retrieveWithSkipped(db: Database, opts: RetrieveOptions): 
     if (!item) continue;
     const age = Math.max(0, t - item.created_at);
     const recency = Math.pow(0.5, age / halfLife);
-    item.score = base * (0.5 + 0.5 * recency) * (0.5 + item.confidence);
-    item.why = { ...(why.get(key) ?? {}), recency, confidence: item.confidence };
+    // relevance (fused rank) x recency x confidence x importance (1..5 -> 0.8..1.2), after Park et al. 2023
+    item.score = base * (0.5 + 0.5 * recency) * (0.5 + item.confidence) * (0.7 + 0.1 * item.importance);
+    item.why = { ...(why.get(key) ?? {}), recency, confidence: item.confidence, importance: item.importance };
     items.push(item);
   }
   items.sort((a, b) => b.score - a.score);
