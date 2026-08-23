@@ -83,17 +83,38 @@ recall export [--out dir] [--project name]
 recall migrate --from <path to a claude-mem db>
 recall relink --legacy <name> --remote <git url>
 recall consolidate [--now]
-recall ui [--port n] [--open]            local viewer, exits with the process
+recall ui [--port n] [--open]            memory manager web app, exits with the process
 recall doctor [--json]                   environment check, exit 1 on failure
 ```
 
-`ui` binds 127.0.0.1 on an ephemeral port only while the command runs. It is dark-mode aware, searches with the same hybrid FTS + vector ranking that session injection uses, and lets you vote observations up/down (same alpha/beta update as the MCP `feedback` tool) or archive them. Tabs for observations, session summaries, and digests; JSON under `/api/*`.
+`ui` binds 127.0.0.1 on an ephemeral port only while the command runs. It is a full memory manager, not just a viewer — everything that ends up in Claude's context can be edited, pinned, excluded, merged, or written by hand:
+
+- **Inbox / All / Pinned / Archived** — list views with hybrid FTS + vector search, type filter, sort. Inbox shows what arrived since your last visit.
+- **Detail pane** — edit title / narrative / facts / files / type / project in place, pin, archive, delete, vote 👍/👎 (same alpha/beta update as the MCP `feedback` tool).
+- **Pinned** observations are always injected at session start (newest first, within the token budget) regardless of score; **archived** ones are never recalled. `+ New` writes a memory by hand.
+- **Bulk triage** — select with `x`, then pin / archive / move to another project / merge duplicates into one / delete.
+- **Session preview** — the exact text the SessionStart hook will inject for a project, its token cost against the budget, and for every item *why* it was chosen (keyword rank, semantic rank, recency, confidence). Pin or exclude from there and the preview refreshes. Pinned items that do not fit the budget are called out.
+- **Sessions / Digests** — edit or delete summaries and digests.
+- **Jobs** — the processor queue with retry/cancel, plus buttons to run the queue, queue a consolidation, or re-embed observations that lack vectors.
+- **Health & transfer** — DB size, counts, embedding coverage, settings, and markdown/JSON **export** of a project's memory and **import** (dry run first). The markdown is hand-editable:
+
+  ```markdown
+  ## [decision] Use UV, never pip
+
+  Narrative paragraph.
+
+  - a fact
+  files: pyproject.toml
+  pinned: yes
+  ```
+
+Keyboard: `j`/`k` move, `Enter` open, `e` edit, `n` new, `p` pin, `a` archive, `d` delete (press twice), `x` select, `Shift+X` select all, `m` merge, `f`/`F` vote, `/` search, `g` then `i a p r s d v j h` to jump views, `?` for the full list. JSON under `/api/*`.
 
 ## Seeing what happens in the background
 
-There is no daemon, so `~/.recall/processor.log` (last 200 lines, rolling) is the only trace of background work: every processor start, each job's outcome and duration, and any error. `recall status` prints the last error and flags jobs that have been pending for over an hour (the processor is not running); `recall doctor` turns that into a failing `queue` check. The viewer's sidebar shows the same.
+There is no daemon, so `~/.recall/processor.log` (last 200 lines, rolling) is the only trace of background work: every processor start, each job's outcome and duration, and any error. `recall status` prints the last error and flags jobs that have been pending for over an hour (the processor is not running); `recall doctor` turns that into a failing `queue` check. The UI's sidebar and Jobs view show the same.
 
-Every session start that received memory is recorded in `context_log` (query, injected items, token cost) and shown in the viewer's **injected** tab, so you can judge whether what Claude saw was the right thing.
+Every session start that received memory is recorded in `context_log` (query, injected items, token cost) and available at `/api/context`, so you can judge whether what Claude saw was the right thing.
 
 ## Standalone binary
 

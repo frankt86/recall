@@ -58,9 +58,10 @@ export const oops = (e) => toast(e.message || String(e), "bad", 6000);
 
 // ---------- routing ----------
 export function go(view, extra = {}) {
-  const next = { view, project: S.project, q: S.q, type: S.type, sort: S.sort, page: 1, id: S.open, ...extra };
+  const next = { view, project: S.project, q: S.q, type: S.type, sort: S.sort, page: 1, id: VIEWS[view].list ? S.open : null, ...extra };
   const p = new URLSearchParams();
-  for (const k of ["project", "q", "type", "sort"]) if (next[k]) p.set(k, next[k]);
+  for (const k of ["project", "q", "type"]) if (next[k]) p.set(k, next[k]);
+  if (next.sort && next.sort !== "created") p.set("sort", next.sort);
   if (next.page > 1) p.set("page", next.page);
   if (next.id) p.set("id", next.id);
   const h = `#/${next.view}${p.toString() ? "?" + p : ""}`;
@@ -124,6 +125,7 @@ export async function load() {
     if (S.open) await openDetail(S.open, { silent: true });
     else renderPane();
   } else {
+    if (!S.openItem || S.openItem.id !== S.open) { S.open = null; S.openItem = null; }
     renderMain();
     renderPane();
   }

@@ -4,7 +4,7 @@ import { portOption, type CommandSpec } from "./args";
 
 export const ui: CommandSpec<{ port?: string; open?: boolean }> = {
   name: "ui",
-  summary: "on-demand local viewer, exits with the process",
+  summary: "local memory manager (web app), exits with the process",
   options: {
     port: { type: "string", help: "port (default: random free port)" },
     open: { type: "boolean", help: "open in the default browser" },

@@ -6,7 +6,7 @@ import { resolveProject } from "./project";
 import { markUnhelpful, markUsed, retrieve } from "./retrieve";
 
 const db = openDb();
-const server = new McpServer({ name: "recall", version: "0.1.0" });
+const server = new McpServer({ name: "recall", version: "0.2.0" });
 
 function projectIdFor(project?: string): string {
   if (project) {

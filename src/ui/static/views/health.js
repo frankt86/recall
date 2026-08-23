@@ -28,7 +28,7 @@ export async function render(main) {
         <input type="file" id="im-file" accept=".md,.markdown,.txt,.json" style="padding:.2rem"><button class="sm" id="im-dry">Dry run</button><button class="sm primary" id="im-go" disabled>Import</button><span id="im-msg" class="muted" style="font-size:12px"></span></div>
         <textarea id="im-text" placeholder="## [decision] Title&#10;&#10;Narrative paragraph.&#10;&#10;- a fact&#10;- another fact&#10;&#10;files: src/a.ts, src/b.ts&#10;pinned: yes"></textarea></div>
 
-      <div class="section"><h2>Settings <span class="muted" style="text-transform:none;letter-spacing:0">(read-only · edit ~/.recall/settings.json)</span></h2><dl class="card" style="display:grid">${settings}</dl></div>`;
+      <div class="section"><h2>Settings <span class="muted" style="text-transform:none;letter-spacing:0">(read-only · edit ~/.recall/settings.json)</span></h2><dl class="card kv">${settings}</dl></div>`;
 
     const link = () => { $("#ex-link").href = `/api/export?project=${encodeURIComponent($("#ex-project").value)}&format=${$("#ex-format").value}`; };
     $("#ex-project").onchange = link; $("#ex-format").onchange = link; link();
