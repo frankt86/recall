@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { dbPath } from "./settings";
 
-export type JobKind = "observe" | "summarize" | "consolidate";
+export type JobKind = "observe" | "summarize" | "consolidate" | "embed";
 export type JobStatus = "pending" | "processing" | "done" | "failed";
 
 export interface Job {
@@ -29,6 +29,8 @@ export interface ObservationRow {
   alpha: number;
   beta: number;
   archived: number;
+  pinned: number;
+  source: string;
   embedding: Uint8Array | null;
 }
 
@@ -119,6 +121,8 @@ CREATE TABLE IF NOT EXISTS observations (
   alpha REAL NOT NULL DEFAULT 1.0,
   beta REAL NOT NULL DEFAULT 1.0,
   archived INTEGER NOT NULL DEFAULT 0,
+  pinned INTEGER NOT NULL DEFAULT 0,
+  source TEXT NOT NULL DEFAULT 'auto',
   embedding BLOB
 );
 CREATE INDEX IF NOT EXISTS idx_obs_project ON observations(project_id, archived, created_at DESC);
@@ -195,8 +199,18 @@ export function openDb(path = dbPath()): Database {
   if (instance) return instance;
   const db = new Database(path, { create: true });
   db.exec(SCHEMA);
+  migrate(db);
   instance = db;
   return db;
+}
+
+// Additive, idempotent upgrades for databases created before a column existed.
+function migrate(db: Database): void {
+  const cols = new Set(db.query<{ name: string }, []>("PRAGMA table_info(observations)").all().map((c) => c.name));
+  if (!cols.has("pinned")) db.exec("ALTER TABLE observations ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0");
+  if (!cols.has("source")) db.exec("ALTER TABLE observations ADD COLUMN source TEXT NOT NULL DEFAULT 'auto'");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_obs_pinned ON observations(project_id, pinned) WHERE pinned = 1");
+  setMeta(db, "schema_version", "2");
 }
 
 export function closeDb(): void {
