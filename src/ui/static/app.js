@@ -4,6 +4,7 @@ import * as preview from "./views/preview.js";
 import * as jobs from "./views/jobs.js";
 import * as health from "./views/health.js";
 import * as sessions from "./views/sessions.js";
+import * as graph from "./views/graph.js";
 
 export const TYPES = ["decision", "bugfix", "feature", "change", "discovery", "refactor", "config", "other", "manual"];
 export const VIEWS = {
@@ -14,6 +15,7 @@ export const VIEWS = {
   sessions: { label: "Sessions", key: "s" },
   digests: { label: "Digests", key: "d" },
   preview: { label: "Session preview", key: "v" },
+  graph: { label: "Knowledge graph", key: "k" },
   jobs: { label: "Jobs", key: "j" },
   health: { label: "Health & transfer", key: "h" },
 };
@@ -153,7 +155,7 @@ function renderMain() {
   const main = $("#main");
   const v = VIEWS[S.view];
   if (!v.list) {
-    const mod = { preview, jobs, health, sessions, digests: sessions }[S.view];
+    const mod = { preview, jobs, health, sessions, digests: sessions, graph }[S.view];
     main.innerHTML = "";
     mod.render(main, S.view).catch(oops);
     return;
@@ -391,7 +393,7 @@ export function toggleHelp() {
   const rows = [
     ["j / k", "move cursor"], ["Enter / o", "open"], ["x", "select"], ["Shift+X", "select all / none"], ["e", "edit"], ["n", "new memory"],
     ["p", "pin / unpin"], ["a", "archive / restore"], ["d", "delete (press twice)"], ["m", "merge selected"], ["f / F", "useful / not useful"],
-    ["/", "search"], ["g then i a p r s d v j h", "jump to view"], ["Esc", "close pane / clear selection"], ["?", "this help"],
+    ["/", "search"], ["g then i a p r s d v k j h", "jump to view"], ["Esc", "close pane / clear selection"], ["?", "this help"],
   ];
   ov.innerHTML = `<div class="overlay"><div class="help"><h2>Keyboard</h2><div class="cols">${rows.map(([k, v]) => `<div><span>${v}</span><kbd>${k}</kbd></div>`).join("")}</div></div></div>`;
   ov.firstElementChild.onclick = (e) => { if (e.target === ov.firstElementChild) ov.innerHTML = ""; };

@@ -94,6 +94,7 @@ recall doctor [--json]                   environment check, exit 1 on failure
 - **Pinned** observations are always injected at session start (newest first, within the token budget) regardless of score; **archived** ones are never recalled. `+ New` writes a memory by hand.
 - **Bulk triage** — select with `x`, then pin / archive / move to another project / merge duplicates into one / delete.
 - **Session preview** — the exact text the SessionStart hook will inject for a project, its token cost against the budget, and for every item *why* it was chosen (keyword rank, semantic rank, recency, confidence). Pin or exclude from there and the preview refreshes. Pinned items that do not fit the budget are called out.
+- **Knowledge graph** — entities (files, symbols, commands, libraries, concepts) and weighted relations, extracted automatically from every observation (deterministically from paths/backticked identifiers, plus what the extractor LLM names) and updated incrementally. The view is a force layout filtered by kind / minimum mentions / name; click a node for its related entities and the memories behind it. The graph only ever reflects *active* memory, so retiring memory prunes it. Retrieval also uses it: query terms that hit entity names pull in linked memories as a fourth ranked list.
 - **Sessions / Digests** — edit or delete summaries and digests.
 - **Jobs** — the processor queue with retry/cancel, plus buttons to run the queue, queue a consolidation, or re-embed observations that lack vectors.
 - **Health & transfer** — DB size, counts, embedding coverage, settings, and markdown/JSON **export** of a project's memory and **import** (dry run first). The markdown is hand-editable:
@@ -109,6 +110,17 @@ recall doctor [--json]                   environment check, exit 1 on failure
   ```
 
 Keyboard: `j`/`k` move, `Enter` open, `e` edit, `n` new, `p` pin, `a` archive, `d` delete (press twice), `x` select, `Shift+X` select all, `m` merge, `f`/`F` vote, `/` search, `g` then `i a p r s d v j h` to jump views, `?` for the full list. JSON under `/api/*`.
+
+## Context rot
+
+Memory that is never pruned eventually crowds out what matters, so a `maintain` job runs with the processor every `maintainEveryHours` (12) and can be triggered from the UI:
+
+- **Retire** — after `retireAfterDays` (45), observations that were injected 3+ times but never marked useful, or whose confidence fell below 40 %, are archived.
+- **Deduplicate** — near-duplicate observations (embedding cosine ≥ `dedupeThreshold`, 0.92) are folded: the older is archived with `superseded_by` pointing at the newer.
+- **Cap** — at most `maxActivePerProject` (400) active observations per project; the weakest by confidence × recency are archived first.
+- **Prune** — graph entities with no active memory are dropped after 30 days; edge weights decay by `graphEdgeDecay` (0.95) per run and faint edges are removed; done jobs older than 7 days and context logs older than 90 days are deleted.
+
+Pinned and hand-written (`manual` / `import`) memory is never auto-retired. Archived memory is not injected but stays searchable (`include_archived`) and can be restored from the Archived view. Health shows the last run's numbers.
 
 ## Seeing what happens in the background
 

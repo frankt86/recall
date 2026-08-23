@@ -192,3 +192,26 @@ test("export and import round-trip via markdown, dry run inserts nothing", async
   expect((await post("/api/import", { project_id: "zz", format: "md", content: md })).status).toBe(400);
   expect((await post("/api/import", { project_id: "p2", format: "xml", content: md })).status).toBe(400);
 });
+
+test("graph endpoints and maintenance/regraph actions", async () => {
+  const r = await post("/api/observations", { project_id: "p1", type: "manual", title: "Graph seed", narrative: "`openDb()` lives in `src/db.ts` and is called by `startUi()`.", files: ["src/db.ts"] });
+  expect(r.status).toBe(201);
+  expect((await post("/api/actions/regraph", { project: "p1" })).status).toBe(200);
+  const g = await get("/api/graph?project=p1");
+  const node = g.nodes.find((n: any) => n.name === "openDb");
+  expect(node).toBeDefined();
+  expect(g.edges.length).toBeGreaterThan(0);
+  const e = await get(`/api/graph/entity/${node.id}`);
+  expect(e.entity.kind).toBe("symbol");
+  expect(e.observations.some((o: any) => o.title === "Graph seed")).toBe(true);
+  expect(e.neighbors.some((n: any) => n.name === "src/db.ts")).toBe(true);
+  expect((await get("/api/graph?project=p1&kinds=file")).nodes.every((n: any) => n.kind === "file")).toBe(true);
+  expect((await fetch(base + "/api/graph?project=zz")).status).toBe(404);
+  expect((await fetch(base + "/api/graph/entity/999999")).status).toBe(404);
+  const m = await (await post("/api/actions/maintain", {})).json();
+  expect(m.ok).toBe(true);
+  expect(m.stats.at).toBeGreaterThan(0);
+  const h = await get("/api/health");
+  expect(h.lastMaintenance.at).toBe(m.stats.at);
+  expect(typeof h.counts.entities).toBe("number");
+});

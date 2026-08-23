@@ -10,6 +10,7 @@ export async function render(main) {
       <button class="sm" data-action="process" title="run the queue now, in this server process">▶ Run queue</button>
       <button class="sm" data-action="consolidate" title="queue a digest pass over old observations">Consolidate</button>
       <button class="sm" data-action="reembed" title="queue embeddings for observations that have none">Re-embed missing</button>
+      <button class="sm" data-action="maintain" title="retire stale memory, fold duplicates, cap per project, prune graph — runs automatically every 12h">Maintain now</button>
     </span></div><div id="jb"></div>`;
   $("#jb-status").onchange = draw;
   main.onclick = async (e) => {

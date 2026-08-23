@@ -12,12 +12,18 @@ export async function render(main) {
     const cov = h.embeddable ? Math.round((h.embedded / h.embeddable) * 100) : 100;
     const stats = [
       ["observations", h.counts.observations], ["sessions", h.counts.summaries], ["digests", h.counts.digests], ["jobs", h.counts.jobs],
+      ["archived", h.counts.archived ?? 0], ["entities", h.counts.entities ?? 0], ["relations", h.counts.edges ?? 0],
       ["embedding coverage", `${cov}%`], ["database", kb(h.dbBytes)],
     ].map(([k, v]) => `<div class="stat"><div class="v">${v}</div><div class="k">${k}</div></div>`).join("");
     const settings = Object.entries(h.settings).map(([k, v]) => `<dt>${esc(k)}</dt><dd class="mono">${esc(Array.isArray(v) ? v.join(", ") || "—" : String(v))}</dd>`).join("");
     $("#hl").innerHTML = `
       <div class="grid">${stats}</div>
       <p class="muted" style="font-size:12px">DB: <span class="mono">${esc(h.dbPath)}</span> · embeddings ${h.embeddingsEnabled ? (h.embeddingsReady ? "ready" : "enabled, model not loaded yet") : "disabled"}${h.lastError ? ` · <span style="color:var(--bad)">last error: ${esc(h.lastError)}</span>` : ""}</p>
+
+      <div class="section"><h2>Context-rot maintenance</h2><div class="card maint">
+        ${h.lastMaintenance ? `Last run ${new Date(h.lastMaintenance.at).toISOString().replace("T", " ").slice(0, 16)} — retired <b>${h.lastMaintenance.retired}</b>, deduplicated <b>${h.lastMaintenance.deduped}</b>, capped <b>${h.lastMaintenance.capped}</b>, pruned <b>${h.lastMaintenance.graphEntities}</b> entities / <b>${h.lastMaintenance.graphEdges}</b> relations, cleared <b>${h.lastMaintenance.jobsDeleted}</b> old jobs.` : "Not run yet — it runs automatically with the processor every <b>" + h.settings.maintainEveryHours + "h</b>."}
+        <div class="muted" style="margin-top:.3rem">Rules: after <b>${h.settings.retireAfterDays}</b> days, memory shown 3+ times but never marked useful (or confidence &lt; 40%) is archived; near-duplicates (cosine ≥ <b>${h.settings.dedupeThreshold}</b>) are folded into the newer one; at most <b>${h.settings.maxActivePerProject}</b> active per project. Pinned and hand-written memory is never auto-retired. Archived memory stays searchable with "include archived".</div>
+        <div class="actions" style="margin-top:.4rem"><button class="sm" id="hl-maintain">Run maintenance now</button><span id="hl-maint-msg" class="muted"></span></div></div></div>
 
       <div class="section xfer"><h2>Export</h2>
         <div class="actions"><select id="ex-project">${projects}</select><select id="ex-format"><option value="md">markdown</option><option value="json">json</option></select>
@@ -30,6 +36,10 @@ export async function render(main) {
 
       <div class="section"><h2>Settings <span class="muted" style="text-transform:none;letter-spacing:0">(read-only · edit ~/.recall/settings.json)</span></h2><dl class="card kv">${settings}</dl></div>`;
 
+    $("#hl-maintain").onclick = async () => {
+      const b = $("#hl-maintain"); b.disabled = true;
+      try { const r = await api("/api/actions/maintain", { body: {} }); toast(r.message, "info", 6000); await refreshProjects(); render(main); } catch (err) { oops(err); b.disabled = false; }
+    };
     const link = () => { $("#ex-link").href = `/api/export?project=${encodeURIComponent($("#ex-project").value)}&format=${$("#ex-format").value}`; };
     $("#ex-project").onchange = link; $("#ex-format").onchange = link; link();
 

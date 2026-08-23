@@ -9,6 +9,8 @@ import { dbPath, loadSettings } from "../../settings";
 import { fail, intParam, json, obsOut, parseList, projectExists, type Router } from "../http";
 import { fromJson, fromMarkdown, toJson, toMarkdown, type ObsIn } from "../transfer";
 import { insertObservation } from "./observations";
+import { entityObservations, graph, neighbors, relinkAll } from "../../graph";
+import { lastMaintenance, runMaintain } from "../../maintain";
 
 const parseJson = (s: string | null): unknown[] => {
   try { const v = JSON.parse(s || "[]"); return Array.isArray(v) ? v : []; } catch { return []; }
@@ -112,6 +114,8 @@ export function registerOtherRoutes(r: Router): void {
     const project = typeof body?.project === "string" ? body.project : undefined;
     if (params.name === "consolidate") { enqueue(db, "consolidate", Math.floor(now() / 1000)); return json({ ok: true, message: "consolidation queued; run the queue to execute" }); }
     if (params.name === "reembed") { const { enqueueMissingEmbeddings } = await import("../../processor"); const n = enqueueMissingEmbeddings(db, project); return json({ ok: true, message: `queued ${n} embedding job(s)` }); }
+    if (params.name === "maintain") { const st = runMaintain(db); return json({ ok: true, message: `maintenance: retired ${st.retired}, capped ${st.capped}, deduped ${st.deduped}, pruned ${st.graphEntities} entities / ${st.graphEdges} edges`, stats: st }); }
+    if (params.name === "regraph") { const n = relinkAll(db, project); return json({ ok: true, message: `rebuilt graph links for ${n} observation(s)` }); }
     if (params.name === "process") { const { drain } = await import("../../processor"); const n = await drain(db, { quiet: true }); return json({ ok: true, message: n === 0 ? "nothing to process (or another processor holds the lock)" : `processed ${n} job(s)` }); }
     return fail(404, "unknown action");
   });
@@ -125,7 +129,23 @@ export function registerOtherRoutes(r: Router): void {
     const embedded = db.query<{ n: number }, []>("SELECT COUNT(*) n FROM observations WHERE embedding IS NOT NULL AND archived = 0").get()!.n;
     const embeddable = db.query<{ n: number }, []>("SELECT COUNT(*) n FROM observations WHERE archived = 0").get()!.n;
     const s = loadSettings();
-    return json({ dbPath: path, dbBytes, counts, embedded, embeddable, embeddingsEnabled: s.embeddings, embeddingsReady: s.embeddings ? await embeddingsAvailable() : false, settings: s, lastError: lastError() });
+    for (const t of ["entities", "edges"]) counts[t] = db.query<{ n: number }, []>(`SELECT COUNT(*) n FROM ${t}`).get()!.n;
+    counts.archived = db.query<{ n: number }, []>("SELECT COUNT(*) n FROM observations WHERE archived = 1").get()!.n;
+    return json({ dbPath: path, dbBytes, counts, embedded, embeddable, embeddingsEnabled: s.embeddings, embeddingsReady: s.embeddings ? await embeddingsAvailable() : false, settings: s, lastError: lastError(), lastMaintenance: lastMaintenance(db) });
+  });
+
+  r.get("/api/graph", ({ db, url }) => {
+    const project = url.searchParams.get("project") || "";
+    if (!projectExists(db, project)) fail(404, "no such project");
+    const kinds = (url.searchParams.get("kinds") || "").split(",").filter(Boolean);
+    const g = graph(db, project, { minMentions: Number(url.searchParams.get("min") || 1) || 1, limit: Number(url.searchParams.get("limit") || 150) || 150, kinds, q: url.searchParams.get("q") || "" });
+    return json(g);
+  });
+  r.get("/api/graph/entity/:id", ({ db, params }) => {
+    const id = intParam(params.id);
+    const e = db.query<{ id: number; project_id: string; name: string; kind: string; first_seen: number; last_seen: number }, [number]>("SELECT * FROM entities WHERE id = ?").get(id);
+    if (!e) fail(404, "no such entity");
+    return json({ entity: e, observations: entityObservations(db, id).map(obsOut), neighbors: neighbors(db, id) });
   });
 
   r.get("/api/export", ({ db, url }) => {

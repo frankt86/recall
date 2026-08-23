@@ -16,6 +16,8 @@ import {
   type ObservationRow,
 } from "./db";
 import { embed } from "./embed";
+import { linkObservation, type EntityIn, type RelationIn } from "./graph";
+import { runMaintain } from "./maintain";
 import { complete, extractJson } from "./llm";
 import { env, loadSettings } from "./settings";
 import { appendLog } from "./log";
@@ -28,8 +30,9 @@ const OBS_SYSTEM = `You are OBSERVATION_EXTRACTOR for a developer memory system.
 You receive one user prompt to a coding agent plus the tool calls it made in response.
 Produce durable, specific observations a future session would want: decisions made, bugs found and root causes, how the code is structured, commands that worked, constraints discovered, what was changed and why.
 Skip trivia (listing directories, reading files with no conclusion). Merge related events into one observation. Prefer 1 to 4 observations. Never include secrets.
+Also name the entities each observation is about and how they relate, for a knowledge graph: files, code symbols (functions, classes, modules), shell commands, libraries, and concepts (named decisions, patterns, features). Use exact identifiers; 2-8 entities per observation; relations only between named entities.
 Respond with ONLY a JSON object:
-{"observations":[{"type":"decision|bugfix|feature|change|discovery|refactor|config|other","title":"<=80 chars, specific","narrative":"2-5 sentences, past tense, concrete identifiers","facts":["short atomic facts"],"files":["relative/paths"]}]}`;
+{"observations":[{"type":"decision|bugfix|feature|change|discovery|refactor|config|other","title":"<=80 chars, specific","narrative":"2-5 sentences, past tense, concrete identifiers","facts":["short atomic facts"],"files":["relative/paths"],"entities":[{"name":"src/db.ts","kind":"file|symbol|command|library|concept"}],"relations":[{"from":"entity name","to":"entity name","rel":"uses|calls|defines|configures|depends_on|fixes|relates_to"}]}]}`;
 
 const SUM_SYSTEM = `You are SESSION_SUMMARIZER for a developer memory system.
 You receive the user prompts and extracted observations from one coding session.
@@ -40,7 +43,7 @@ const DIGEST_SYSTEM = `You are DIGEST_WRITER for a developer memory system.
 You receive many older observations from one project over a period. Write a dense project digest in markdown (max 400 words): architecture facts, standing decisions, recurring gotchas, file map. Drop transient details. No preamble.`;
 
 interface ObsOut {
-  observations: Array<{ type?: string; title: string; narrative: string; facts?: string[]; files?: string[] }>;
+  observations: Array<{ type?: string; title: string; narrative: string; facts?: string[]; files?: string[]; entities?: EntityIn[]; relations?: RelationIn[] }>;
 }
 
 interface SumOut {
@@ -96,7 +99,7 @@ async function runObserve(db: Database, promptId: number): Promise<void> {
   );
   const tx = db.transaction(() => {
     obs.forEach((o, i) => {
-      insert.run(
+      const r = insert.run(
         session.project_id,
         prompt.session_id,
         promptId,
@@ -108,6 +111,8 @@ async function runObserve(db: Database, promptId: number): Promise<void> {
         prompt.created_at,
         vectors ? floatsToBlob(vectors[i]) : null,
       );
+      const row = db.query<ObservationRow, [number]>("SELECT * FROM observations WHERE id = ?").get(Number(r.lastInsertRowid))!;
+      linkObservation(db, row, Array.isArray(o.entities) ? o.entities : [], Array.isArray(o.relations) ? o.relations : []);
     });
     db.query("DELETE FROM events WHERE prompt_id = ?").run(promptId);
   });
@@ -219,6 +224,9 @@ function maybeScheduleConsolidation(db: Database): void {
   const s = loadSettings();
   const last = Number(getMeta(db, "last_consolidation") ?? 0);
   if (now() - last > s.consolidateEveryHours * 3600000) enqueue(db, "consolidate", Math.floor(now() / 3600000));
+  let lastMaint = 0;
+  try { lastMaint = Number(JSON.parse(getMeta(db, "last_maintenance") ?? "{}").at ?? 0); } catch { /* ignore */ }
+  if (now() - lastMaint > s.maintainEveryHours * 3600000) enqueue(db, "maintain", Math.floor(now() / 3600000));
 }
 
 async function handle(db: Database, job: Job): Promise<void> {
@@ -226,6 +234,7 @@ async function handle(db: Database, job: Job): Promise<void> {
   else if (job.kind === "summarize") await runSummarize(db, job.ref_id);
   else if (job.kind === "consolidate") await runConsolidate(db);
   else if (job.kind === "embed") await runEmbed(db, job.ref_id);
+  else if (job.kind === "maintain") runMaintain(db);
 }
 
 export async function drain(db: Database, opts: { maxJobs?: number; quiet?: boolean } = {}): Promise<number> {

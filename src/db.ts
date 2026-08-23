@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { dbPath } from "./settings";
 
-export type JobKind = "observe" | "summarize" | "consolidate" | "embed";
+export type JobKind = "observe" | "summarize" | "consolidate" | "embed" | "maintain";
 export type JobStatus = "pending" | "processing" | "done" | "failed";
 
 export interface Job {
@@ -31,6 +31,7 @@ export interface ObservationRow {
   archived: number;
   pinned: number;
   source: string;
+  superseded_by: number | null;
   embedding: Uint8Array | null;
 }
 
@@ -123,6 +124,7 @@ CREATE TABLE IF NOT EXISTS observations (
   archived INTEGER NOT NULL DEFAULT 0,
   pinned INTEGER NOT NULL DEFAULT 0,
   source TEXT NOT NULL DEFAULT 'auto',
+  superseded_by INTEGER,
   embedding BLOB
 );
 CREATE INDEX IF NOT EXISTS idx_obs_project ON observations(project_id, archived, created_at DESC);
@@ -186,6 +188,34 @@ CREATE TABLE IF NOT EXISTS digests (
 );
 CREATE INDEX IF NOT EXISTS idx_digest_project ON digests(project_id, period_end DESC);
 
+CREATE TABLE IF NOT EXISTS entities (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  first_seen INTEGER NOT NULL,
+  last_seen INTEGER NOT NULL,
+  UNIQUE(project_id, name, kind)
+);
+CREATE INDEX IF NOT EXISTS idx_entities_project ON entities(project_id, kind);
+CREATE TABLE IF NOT EXISTS observation_entities (
+  observation_id INTEGER NOT NULL REFERENCES observations(id) ON DELETE CASCADE,
+  entity_id INTEGER NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  PRIMARY KEY(observation_id, entity_id)
+);
+CREATE INDEX IF NOT EXISTS idx_obs_entities_entity ON observation_entities(entity_id);
+CREATE TABLE IF NOT EXISTS edges (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id TEXT NOT NULL,
+  src INTEGER NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  dst INTEGER NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  rel TEXT NOT NULL,
+  weight REAL NOT NULL DEFAULT 1,
+  last_seen INTEGER NOT NULL,
+  UNIQUE(src, dst, rel)
+);
+CREATE INDEX IF NOT EXISTS idx_edges_project ON edges(project_id, weight DESC);
+
 CREATE TABLE IF NOT EXISTS locks (
   name TEXT PRIMARY KEY,
   owner TEXT NOT NULL,
@@ -209,8 +239,9 @@ function migrate(db: Database): void {
   const cols = new Set(db.query<{ name: string }, []>("PRAGMA table_info(observations)").all().map((c) => c.name));
   if (!cols.has("pinned")) db.exec("ALTER TABLE observations ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0");
   if (!cols.has("source")) db.exec("ALTER TABLE observations ADD COLUMN source TEXT NOT NULL DEFAULT 'auto'");
+  if (!cols.has("superseded_by")) db.exec("ALTER TABLE observations ADD COLUMN superseded_by INTEGER");
   db.exec("CREATE INDEX IF NOT EXISTS idx_obs_pinned ON observations(project_id, pinned) WHERE pinned = 1");
-  setMeta(db, "schema_version", "2");
+  setMeta(db, "schema_version", "3");
 }
 
 export function closeDb(): void {

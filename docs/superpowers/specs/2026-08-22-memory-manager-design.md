@@ -115,3 +115,8 @@ All JSON. Errors `{ error }` with 4xx/5xx. Ids are integers. Bodies validated as
 ## Out of scope
 
 Auth, remote access, live updates (refetch after mutations), undo history, native packaging.
+
+## Addendum (2026-08-23): context rot and knowledge graph
+
+- `maintain` job (`src/maintain.ts`): retire / dedupe / cap / prune / housekeeping, scheduled every `maintainEveryHours`, protected set = pinned or source in (manual, import). Stats stored in `meta.last_maintenance`, shown in Health, `POST /api/actions/maintain`.
+- Knowledge graph (`src/graph.ts`): tables `entities`, `observation_entities`, `edges`; `linkObservation` on observe/embed; deterministic + LLM extraction; `graph()` view computed over active observations only; `graphHits` feeds a fourth RRF list in `retrieve`. UI view `graph` (force layout), `GET /api/graph`, `GET /api/graph/entity/:id`, `POST /api/actions/regraph`.

@@ -11,6 +11,11 @@ export interface Settings {
   contextMaxItems: number;
   consolidateAfterDays: number;
   consolidateEveryHours: number;
+  maintainEveryHours: number;
+  retireAfterDays: number;
+  maxActivePerProject: number;
+  dedupeThreshold: number;
+  graphEdgeDecay: number;
   maxEventChars: number;
   maxPromptEvents: number;
   redact: boolean;
@@ -27,6 +32,11 @@ export const DEFAULTS: Settings = {
   contextMaxItems: 12,
   consolidateAfterDays: 30,
   consolidateEveryHours: 24,
+  maintainEveryHours: 12,
+  retireAfterDays: 45,
+  maxActivePerProject: 400,
+  dedupeThreshold: 0.92,
+  graphEdgeDecay: 0.95,
   maxEventChars: 6000,
   maxPromptEvents: 80,
   redact: true,

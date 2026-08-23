@@ -56,7 +56,7 @@ test("migration adds pinned/source to a pre-existing DB and is idempotent", asyn
   expect(cols(db)).toContain("pinned");
   expect(cols(db)).toContain("source");
   expect(db.query<{ pinned: number; source: string }, []>("SELECT pinned, source FROM observations").get()).toEqual({ pinned: 0, source: "auto" });
-  expect(getMeta(db, "schema_version")).toBe("2");
+  expect(getMeta(db, "schema_version")).toBe("3");
   closeDb();
   const db2 = openDb(path);
   expect(cols(db2).filter((c) => c === "pinned")).toHaveLength(1);

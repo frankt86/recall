@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
 import { blobToFloats, type ObservationRow, type SummaryRow } from "./db";
 import { cosine, embedOne } from "./embed";
+import { graphHits } from "./graph";
 
 export type ItemKind = "observation" | "summary" | "digest";
 
@@ -8,6 +9,7 @@ export type ItemKind = "observation" | "summary" | "digest";
 export interface Why {
   fts?: number;
   vec?: number;
+  graph?: number;
   recent?: number;
   recency: number;
   confidence: number;
@@ -118,7 +120,7 @@ export async function retrieve(db: Database, opts: RetrieveOptions): Promise<Sco
   return (await retrieveWithSkipped(db, opts)).items;
 }
 
-type ListName = "fts" | "vec" | "recent";
+type ListName = "fts" | "vec" | "graph" | "recent";
 
 export async function retrieveWithSkipped(db: Database, opts: RetrieveOptions): Promise<RetrieveResult> {
   const limit = opts.limit ?? 12;
@@ -181,6 +183,15 @@ export async function retrieveWithSkipped(db: Database, opts: RetrieveOptions): 
       .sort((a, b) => b.s - a.s)
       .slice(0, 20)
       .forEach((h, i) => push(`summary:${h.id}`, i + 1, "vec"));
+  }
+
+  // knowledge-graph list: observations attached to entities the query names
+  if (opts.query.trim()) {
+    const hits = graphHits(db, opts.projectId, opts.query, !!opts.includeArchived);
+    const allowed = opts.types?.length || opts.since || opts.until
+      ? new Set(db.query<{ id: number }, (string | number)[]>(`SELECT id FROM observations WHERE project_id = ? ${archivedClause} ${typeClause} ${sinceClause} ${untilClause}`).all(opts.projectId, ...extra).map((r) => r.id))
+      : null;
+    hits.filter((id) => !allowed || allowed.has(id)).forEach((id, i) => push(`observation:${id}`, i + 1, "graph"));
   }
 
   // recency list always contributes so an empty query still returns the latest work
