@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 const dir = "/tmp/recall-pipe-" + process.pid;
 mkdirSync(dir, { recursive: true });
@@ -57,3 +58,21 @@ test("hooks -> queue -> processor -> context", async () => {
   expect(row.query).toContain("feature/x");
   db3.close();
 }, 30000);
+
+test("embed job: enqueueMissingEmbeddings queues only unembedded observations and drain completes them", async () => {
+  const { openDb, closeDb, now } = await import("../src/db");
+  const { enqueueMissingEmbeddings, drain } = await import("../src/processor");
+  closeDb();
+  const db = openDb(join(dir, "embed.db"));
+  db.query("INSERT INTO projects(id, name, root_path, remote, created_at) VALUES ('p1','demo','/d',NULL,?)").run(now());
+  db.query("INSERT INTO sessions(claude_session_id, project_id, cwd, started_at) VALUES ('s1','p1','/d',?)").run(now());
+  const ins = db.query("INSERT INTO observations(project_id, session_id, type, title, narrative, created_at, embedding) VALUES ('p1',1,'other',?,'n',?,?)");
+  ins.run("no vector", now(), null);
+  ins.run("has vector", now(), new Uint8Array([0, 0, 0, 0]));
+  expect(enqueueMissingEmbeddings(db)).toBe(1);
+  expect(enqueueMissingEmbeddings(db)).toBe(1); // idempotent: same pending job, still counted
+  expect(db.query("SELECT COUNT(*) n FROM jobs WHERE kind='embed'").get()).toEqual({ n: 1 });
+  await drain(db, { quiet: true });
+  expect(db.query("SELECT status FROM jobs WHERE kind='embed'").get()).toEqual({ status: "done" });
+  closeDb();
+});

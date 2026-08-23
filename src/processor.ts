@@ -196,6 +196,25 @@ async function runConsolidate(db: Database): Promise<void> {
   setMeta(db, "last_consolidation", String(now()));
 }
 
+async function runEmbed(db: Database, obsId: number): Promise<void> {
+  const o = db.query<ObservationRow, [number]>("SELECT * FROM observations WHERE id = ?").get(obsId);
+  if (!o) return;
+  let facts: string[] = [];
+  try { facts = JSON.parse(o.facts); } catch { /* ignore */ }
+  const v = await embed([[o.title, o.narrative, ...facts].join("\n")]);
+  if (!v) return; // embeddings unavailable: job still completes, re-embed later
+  db.query("UPDATE observations SET embedding = ? WHERE id = ?").run(floatsToBlob(v[0]), obsId);
+}
+
+// Queue an embed job for every live observation lacking a vector (optionally one project). Returns how many were queued.
+export function enqueueMissingEmbeddings(db: Database, projectId?: string): number {
+  const rows = projectId
+    ? db.query<{ id: number }, [string]>("SELECT id FROM observations WHERE embedding IS NULL AND archived = 0 AND project_id = ?").all(projectId)
+    : db.query<{ id: number }, []>("SELECT id FROM observations WHERE embedding IS NULL AND archived = 0").all();
+  db.transaction(() => { for (const r of rows) enqueue(db, "embed", r.id); })();
+  return rows.length;
+}
+
 function maybeScheduleConsolidation(db: Database): void {
   const s = loadSettings();
   const last = Number(getMeta(db, "last_consolidation") ?? 0);
@@ -206,6 +225,7 @@ async function handle(db: Database, job: Job): Promise<void> {
   if (job.kind === "observe") await runObserve(db, job.ref_id);
   else if (job.kind === "summarize") await runSummarize(db, job.ref_id);
   else if (job.kind === "consolidate") await runConsolidate(db);
+  else if (job.kind === "embed") await runEmbed(db, job.ref_id);
 }
 
 export async function drain(db: Database, opts: { maxJobs?: number; quiet?: boolean } = {}): Promise<number> {
