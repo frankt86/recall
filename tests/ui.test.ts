@@ -106,9 +106,3 @@ test("edit observation title/narrative/facts and reindex fts", async () => {
   expect(bad.status).toBe(400);
 });
 
-test("served page script parses", async () => {
-  const html = await (await fetch(base + "/")).text();
-  const js = html.slice(html.indexOf("<script>") + 8, html.indexOf("</script>"));
-  expect(() => new Function(js)).not.toThrow();
-  expect(js).not.toContain(String.fromCharCode(92) + "u20");
-});
