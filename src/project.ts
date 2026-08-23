@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { basename, dirname, join } from "node:path";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { Database } from "bun:sqlite";
 import { now } from "./db";
 
@@ -88,4 +88,30 @@ export function ensureProject(db: Database, p: ProjectInfo): void {
     `INSERT INTO projects(id, name, root_path, remote, created_at) VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET name = excluded.name, root_path = excluded.root_path`,
   ).run(p.id, p.name, p.root, p.remote, now());
+}
+
+// Query signal for retrieval: branch name plus recently modified source files (cheap, no git exec).
+export function recentFiles(root: string): string[] {
+  const out: Array<{ p: string; m: number }> = [];
+  const skip = new Set(["node_modules", ".git", "dist", "build", ".venv", "venv", "__pycache__", "target", ".next"]);
+  const walk = (dir: string, depth: number) => {
+    if (depth > 3 || out.length > 4000) return;
+    let entries: string[] = [];
+    try { entries = readdirSync(dir); } catch { return; }
+    for (const e of entries) {
+      if (skip.has(e) || e.startsWith(".")) continue;
+      const full = join(dir, e);
+      try {
+        const st = statSync(full);
+        if (st.isDirectory()) walk(full, depth + 1);
+        else if (st.size < 2_000_000) out.push({ p: full.slice(root.length + 1), m: st.mtimeMs });
+      } catch { /* ignore */ }
+    }
+  };
+  if (existsSync(root)) walk(root, 0);
+  return out.sort((a, b) => b.m - a.m).slice(0, 8).map((f) => f.p);
+}
+
+export function recentFilesQuery(root: string, branch: string | null): string {
+  return [branch ?? "", ...recentFiles(root).map((f) => f.replace(/[\/\\._\-]+/g, " "))].join(" ");
 }
