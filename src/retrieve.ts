@@ -4,6 +4,15 @@ import { cosine, embedOne } from "./embed";
 
 export type ItemKind = "observation" | "summary" | "digest";
 
+// Rank each retrieval list gave the item (1 = best); absent when the list did not return it.
+export interface Why {
+  fts?: number;
+  vec?: number;
+  recent?: number;
+  recency: number;
+  confidence: number;
+}
+
 export interface ScoredItem {
   kind: ItemKind;
   id: number;
@@ -14,6 +23,13 @@ export interface ScoredItem {
   body: string;
   files: string[];
   type: string;
+  pinned: boolean;
+  why: Why;
+}
+
+export interface RetrieveResult {
+  items: ScoredItem[];
+  skippedPinned: number[];
 }
 
 export interface RetrieveOptions {
@@ -67,6 +83,8 @@ function obsToItem(o: ObservationRow): ScoredItem {
     body,
     files: safeArr(o.files),
     type: o.type,
+    pinned: !!o.pinned,
+    why: { recency: 1, confidence: o.alpha / (o.alpha + o.beta) },
   };
 }
 
@@ -82,6 +100,8 @@ function sumToItem(s: SummaryRow): ScoredItem {
     body,
     files: [],
     type: "session",
+    pinned: false,
+    why: { recency: 1, confidence: 0.6 },
   };
 }
 
@@ -95,6 +115,12 @@ function safeArr(s: string): string[] {
 }
 
 export async function retrieve(db: Database, opts: RetrieveOptions): Promise<ScoredItem[]> {
+  return (await retrieveWithSkipped(db, opts)).items;
+}
+
+type ListName = "fts" | "vec" | "recent";
+
+export async function retrieveWithSkipped(db: Database, opts: RetrieveOptions): Promise<RetrieveResult> {
   const limit = opts.limit ?? 12;
   const halfLife = (opts.halfLifeDays ?? 21) * 86400000;
   const archivedClause = opts.includeArchived ? "" : "AND archived = 0";
@@ -106,7 +132,11 @@ export async function retrieve(db: Database, opts: RetrieveOptions): Promise<Sco
   if (opts.until) extra.push(opts.until);
 
   const ranks = new Map<string, number[]>();
-  const push = (key: string, rank: number) => ranks.set(key, [...(ranks.get(key) ?? []), rank]);
+  const why = new Map<string, Partial<Record<ListName, number>>>();
+  const push = (key: string, rank: number, list: ListName) => {
+    ranks.set(key, [...(ranks.get(key) ?? []), rank]);
+    why.set(key, { ...(why.get(key) ?? {}), [list]: Math.min(rank, why.get(key)?.[list] ?? Infinity) });
+  };
 
   const q = ftsQuery(opts.query);
   if (q) {
@@ -117,7 +147,7 @@ export async function retrieve(db: Database, opts: RetrieveOptions): Promise<Sco
          ORDER BY bm25(observations_fts, 3.0, 1.0, 2.0) LIMIT 60`,
       )
       .all(q, opts.projectId, ...extra);
-    obsHits.forEach((h, i) => push(`observation:${h.id}`, i + 1));
+    obsHits.forEach((h, i) => push(`observation:${h.id}`, i + 1, "fts"));
     const sumHits = db
       .query<{ id: number }, (string | number)[]>(
         `SELECT s.id FROM summaries_fts f JOIN summaries s ON s.id = f.rowid
@@ -125,7 +155,7 @@ export async function retrieve(db: Database, opts: RetrieveOptions): Promise<Sco
          ORDER BY bm25(summaries_fts) LIMIT 20`,
       )
       .all(q, opts.projectId, ...(opts.since ? [opts.since] : []), ...(opts.until ? [opts.until] : []));
-    sumHits.forEach((h, i) => push(`summary:${h.id}`, i + 1));
+    sumHits.forEach((h, i) => push(`summary:${h.id}`, i + 1, "fts"));
   }
 
   const qv = opts.query.trim() ? await embedOne(opts.query) : null;
@@ -140,7 +170,7 @@ export async function retrieve(db: Database, opts: RetrieveOptions): Promise<Sco
       .map((r) => ({ id: r.id, s: cosine(qv, blobToFloats(r.embedding)!) }))
       .sort((a, b) => b.s - a.s)
       .slice(0, 60);
-    sims.forEach((h, i) => push(`observation:${h.id}`, i + 1));
+    sims.forEach((h, i) => push(`observation:${h.id}`, i + 1, "vec"));
     const srows = db
       .query<{ id: number; embedding: Uint8Array | null }, [string]>(
         "SELECT id, embedding FROM summaries WHERE project_id = ? AND embedding IS NOT NULL ORDER BY created_at DESC LIMIT 1000",
@@ -150,7 +180,7 @@ export async function retrieve(db: Database, opts: RetrieveOptions): Promise<Sco
       .map((r) => ({ id: r.id, s: cosine(qv, blobToFloats(r.embedding)!) }))
       .sort((a, b) => b.s - a.s)
       .slice(0, 20)
-      .forEach((h, i) => push(`summary:${h.id}`, i + 1));
+      .forEach((h, i) => push(`summary:${h.id}`, i + 1, "vec"));
   }
 
   // recency list always contributes so an empty query still returns the latest work
@@ -159,11 +189,11 @@ export async function retrieve(db: Database, opts: RetrieveOptions): Promise<Sco
       `SELECT id FROM observations WHERE project_id = ? ${archivedClause} ${typeClause} ${sinceClause} ${untilClause} ORDER BY created_at DESC LIMIT 30`,
     )
     .all(opts.projectId, ...extra);
-  recentObs.forEach((h, i) => push(`observation:${h.id}`, i + 1));
+  recentObs.forEach((h, i) => push(`observation:${h.id}`, i + 1, "recent"));
   const recentSum = db
     .query<{ id: number }, [string]>("SELECT id FROM summaries WHERE project_id = ? ORDER BY created_at DESC LIMIT 5")
     .all(opts.projectId);
-  recentSum.forEach((h, i) => push(`summary:${h.id}`, i + 1));
+  recentSum.forEach((h, i) => push(`summary:${h.id}`, i + 1, "recent"));
 
   const fused = rrf(ranks);
   const items: ScoredItem[] = [];
@@ -183,21 +213,44 @@ export async function retrieve(db: Database, opts: RetrieveOptions): Promise<Sco
     const age = Math.max(0, t - item.created_at);
     const recency = Math.pow(0.5, age / halfLife);
     item.score = base * (0.5 + 0.5 * recency) * (0.5 + item.confidence);
+    item.why = { ...(why.get(key) ?? {}), recency, confidence: item.confidence };
     items.push(item);
   }
   items.sort((a, b) => b.score - a.score);
 
-  if (!opts.tokenBudget) return items.slice(0, limit);
+  // Pinned observations always lead (newest first); they are exempt from `limit` but not from the token budget.
+  const pinnedRows = opts.includeArchived
+    ? db.query<ObservationRow, (string | number)[]>(`SELECT * FROM observations WHERE project_id = ? AND pinned = 1 ${typeClause} ORDER BY created_at DESC`).all(opts.projectId, ...(opts.types ?? []))
+    : db.query<ObservationRow, (string | number)[]>(`SELECT * FROM observations WHERE project_id = ? AND pinned = 1 AND archived = 0 ${typeClause} ORDER BY created_at DESC`).all(opts.projectId, ...(opts.types ?? []));
+  const pinnedIds = new Set(pinnedRows.map((r) => r.id));
+  const pinnedItems = pinnedRows.map((r) => {
+    const it = obsToItem(r);
+    const scored = items.find((i) => i.kind === "observation" && i.id === r.id);
+    it.score = scored ? scored.score : 0;
+    it.why = scored ? scored.why : it.why;
+    return it;
+  });
+  const rest = items.filter((i) => !(i.kind === "observation" && pinnedIds.has(i.id)));
+
+  if (!opts.tokenBudget) return { items: [...pinnedItems, ...rest.slice(0, limit)], skippedPinned: [] };
   const out: ScoredItem[] = [];
+  const skippedPinned: number[] = [];
   let used = 0;
-  for (const it of items) {
+  for (const it of pinnedItems) {
+    const cost = estimateTokens(it.title + it.body) + 8;
+    if (used + cost > opts.tokenBudget) { skippedPinned.push(it.id); continue; }
+    out.push(it);
+    used += cost;
+  }
+  let n = 0;
+  for (const it of rest) {
     const cost = estimateTokens(it.title + it.body) + 8;
     if (used + cost > opts.tokenBudget) continue;
     out.push(it);
     used += cost;
-    if (out.length >= limit) break;
+    if (++n >= limit) break;
   }
-  return out;
+  return { items: out, skippedPinned };
 }
 
 export function latestDigest(db: Database, projectId: string): string | null {
