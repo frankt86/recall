@@ -121,6 +121,7 @@ export async function retrieve(db: Database, opts: RetrieveOptions): Promise<Sco
 }
 
 type ListName = "fts" | "vec" | "graph" | "recent";
+const RECENT_ONLY_MAX = 3;
 
 export async function retrieveWithSkipped(db: Database, opts: RetrieveOptions): Promise<RetrieveResult> {
   const limit = opts.limit ?? 12;
@@ -241,7 +242,16 @@ export async function retrieveWithSkipped(db: Database, opts: RetrieveOptions): 
     it.why = scored ? scored.why : it.why;
     return it;
   });
-  const rest = items.filter((i) => !(i.kind === "observation" && pinnedIds.has(i.id)));
+  // Relevance gate: with a real query, items that only matched by recency are filler; allow at most RECENT_ONLY_MAX of them
+  // so a session with little relevant memory injects less rather than the same amount.
+  let recentOnly = 0;
+  const rest = items.filter((i) => {
+    if (i.kind === "observation" && pinnedIds.has(i.id)) return false;
+    if (!q && !qv) return true;
+    const w = i.why;
+    if (w.fts || w.vec || w.graph) return true;
+    return ++recentOnly <= RECENT_ONLY_MAX;
+  });
 
   if (!opts.tokenBudget) return { items: [...pinnedItems, ...rest.slice(0, limit)], skippedPinned: [] };
   const out: ScoredItem[] = [];

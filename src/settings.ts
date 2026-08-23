@@ -75,6 +75,11 @@ export function settingsPath(): string {
 
 let cached: Settings | null = null;
 
+// Tests that change RECALL_* env between files need a fresh read.
+export function resetSettings(): void {
+  cached = null;
+}
+
 export function loadSettings(): Settings {
   if (cached) return cached;
   const p = settingsPath();

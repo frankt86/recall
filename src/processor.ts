@@ -5,6 +5,7 @@ import {
   claimNextJob,
   enqueue,
   finishJob,
+  blobToFloats,
   floatsToBlob,
   getMeta,
   now,
@@ -15,7 +16,7 @@ import {
   type Job,
   type ObservationRow,
 } from "./db";
-import { embed } from "./embed";
+import { cosine, embed } from "./embed";
 import { linkObservation, type EntityIn, type RelationIn } from "./graph";
 import { runMaintain } from "./maintain";
 import { complete, extractJson } from "./llm";
@@ -39,11 +40,22 @@ You receive the user prompts and extracted observations from one coding session.
 Respond with ONLY a JSON object:
 {"request":"what the user set out to do, 1-2 sentences","completed":"what was actually finished","learned":"non-obvious things discovered about the codebase or problem","next_steps":"open threads, TODOs, or none"}`;
 
+const RECONCILE_SYSTEM = `You are MEMORY_RECONCILER for a developer memory system.
+You receive one NEW observation and a few EXISTING observations about the same code. Decide, strictly:
+- "supersedes": ids of existing observations whose facts the new one makes outdated or wrong (the state changed, a decision was reversed, a path/name/config moved). Only when the new observation clearly replaces them.
+- "duplicate_of": the id of an existing observation that already says the same thing (no new information), else null.
+When unsure, leave lists empty. Respond with ONLY a JSON object: {"supersedes":[ids],"duplicate_of":id|null}`;
+
 const DIGEST_SYSTEM = `You are DIGEST_WRITER for a developer memory system.
 You receive many older observations from one project over a period. Write a dense project digest in markdown (max 400 words): architecture facts, standing decisions, recurring gotchas, file map. Drop transient details. No preamble.`;
 
 interface ObsOut {
   observations: Array<{ type?: string; title: string; narrative: string; facts?: string[]; files?: string[]; entities?: EntityIn[]; relations?: RelationIn[] }>;
+}
+
+interface ReconcileOut {
+  supersedes?: number[];
+  duplicate_of?: number | null;
 }
 
 interface SumOut {
@@ -97,6 +109,7 @@ async function runObserve(db: Database, promptId: number): Promise<void> {
     `INSERT INTO observations(project_id, session_id, prompt_id, type, title, narrative, facts, files, created_at, embedding)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
+  const inserted: number[] = [];
   const tx = db.transaction(() => {
     obs.forEach((o, i) => {
       const r = insert.run(
@@ -113,11 +126,71 @@ async function runObserve(db: Database, promptId: number): Promise<void> {
       );
       const row = db.query<ObservationRow, [number]>("SELECT * FROM observations WHERE id = ?").get(Number(r.lastInsertRowid))!;
       linkObservation(db, row, Array.isArray(o.entities) ? o.entities : [], Array.isArray(o.relations) ? o.relations : []);
+      inserted.push(row.id);
     });
     db.query("DELETE FROM events WHERE prompt_id = ?").run(promptId);
   });
   tx();
+  for (const id of inserted) await reconcile(db, id);
 }
+
+// Candidates an observation might update: nearest by vector, plus those sharing 2+ graph entities. Active, same project.
+function relatedCandidates(db: Database, o: ObservationRow, limit = 6): ObservationRow[] {
+  const out = new Map<number, ObservationRow>();
+  const v = blobToFloats(o.embedding);
+  if (v) {
+    const rows = db
+      .query<ObservationRow, [string, number]>("SELECT * FROM observations WHERE project_id = ? AND archived = 0 AND id != ? AND embedding IS NOT NULL ORDER BY created_at DESC LIMIT 1500")
+      .all(o.project_id, o.id)
+      .map((r) => ({ r, s: cosine(v, blobToFloats(r.embedding)!) }))
+      .filter((x) => x.s >= 0.72)
+      .sort((a, b) => b.s - a.s)
+      .slice(0, limit);
+    for (const x of rows) out.set(x.r.id, x.r);
+  }
+  const shared = db
+    .query<ObservationRow, [number, string, number]>(
+      `SELECT o.*, COUNT(*) n FROM observation_entities a JOIN observation_entities b ON b.entity_id = a.entity_id AND b.observation_id != a.observation_id
+       JOIN observations o ON o.id = b.observation_id
+       WHERE a.observation_id = ? AND o.project_id = ? AND o.archived = 0 AND o.id != ? GROUP BY o.id HAVING n >= 2 ORDER BY n DESC LIMIT 6`,
+    )
+    .all(o.id, o.project_id, o.id);
+  for (const r of shared) if (out.size < limit + 4) out.set(r.id, r);
+  return [...out.values()];
+}
+
+// Write-time reconciliation: the moment a new fact arrives, retire the older facts it replaces (or itself if redundant).
+export async function reconcile(db: Database, obsId: number): Promise<{ superseded: number[]; duplicateOf: number | null }> {
+  const o = db.query<ObservationRow, [number]>("SELECT * FROM observations WHERE id = ?").get(obsId);
+  const none = { superseded: [] as number[], duplicateOf: null as number | null };
+  if (!o || o.archived) return none;
+  const cands = relatedCandidates(db, o).filter((c) => c.created_at <= o.created_at && !c.pinned);
+  if (!cands.length) return none;
+  const fmt = (r: ObservationRow) => `#${r.id} [${new Date(r.created_at).toISOString().slice(0, 10)}] [${r.type}] ${r.title}\n${trunc(r.narrative, 500)}\nfacts: ${trunc(r.facts, 300)}`;
+  const user = [`NEW OBSERVATION:\n${fmt(o)}`, "", "EXISTING OBSERVATIONS:", ...cands.map(fmt)].join("\n");
+  let parsed: ReconcileOut;
+  try {
+    parsed = extractJson<ReconcileOut>((await complete(RECONCILE_SYSTEM, user, 300)).text);
+  } catch (e) {
+    appendLog(`reconcile#${obsId} skipped: ${String((e as Error).message).slice(0, 120)}`);
+    return none;
+  }
+  const ids = new Set(cands.map((c) => c.id));
+  const superseded = (parsed.supersedes ?? []).map(Number).filter((id) => ids.has(id));
+  const dup = parsed.duplicate_of != null && ids.has(Number(parsed.duplicate_of)) ? Number(parsed.duplicate_of) : null;
+  db.transaction(() => {
+    if (dup != null && o.source === "auto") {
+      // redundant: keep the established memory, fold the newcomer into it
+      db.query("UPDATE observations SET archived = 1, superseded_by = ? WHERE id = ?").run(dup, o.id);
+      db.query("UPDATE observations SET alpha = alpha + 0.5 WHERE id = ?").run(dup);
+    } else {
+      for (const id of superseded) db.query("UPDATE observations SET archived = 1, superseded_by = ? WHERE id = ? AND pinned = 0").run(o.id, id);
+    }
+  })();
+  if (superseded.length || dup != null) appendLog(`reconcile#${obsId}: supersedes [${superseded.join(",")}]${dup != null ? ` duplicate_of #${dup}` : ""}`);
+  return { superseded: dup != null && o.source === "auto" ? [] : superseded, duplicateOf: o.source === "auto" ? dup : null };
+}
+
 
 async function runSummarize(db: Database, sessionId: number): Promise<void> {
   const session = db
@@ -209,6 +282,7 @@ async function runEmbed(db: Database, obsId: number): Promise<void> {
   const v = await embed([[o.title, o.narrative, ...facts].join("\n")]);
   if (!v) return; // embeddings unavailable: job still completes, re-embed later
   db.query("UPDATE observations SET embedding = ? WHERE id = ?").run(floatsToBlob(v[0]), obsId);
+  await reconcile(db, obsId);
 }
 
 // Queue an embed job for every live observation lacking a vector (optionally one project). Returns how many were queued.

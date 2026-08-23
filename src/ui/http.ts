@@ -79,7 +79,7 @@ export function obsOut(r: ObservationRow) {
     id: r.id, project_id: r.project_id, session_id: r.session_id, type: r.type, title: r.title, narrative: r.narrative,
     facts: parseList(r.facts), files: parseList(r.files), created_at: r.created_at,
     confidence: r.alpha / (r.alpha + r.beta), alpha: r.alpha, beta: r.beta,
-    archived: !!r.archived, pinned: !!r.pinned, source: r.source, embedded: r.embedding != null,
+    archived: !!r.archived, pinned: !!r.pinned, source: r.source, superseded_by: r.superseded_by ?? null, embedded: r.embedding != null,
   };
 }
 

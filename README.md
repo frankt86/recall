@@ -113,7 +113,13 @@ Keyboard: `j`/`k` move, `Enter` open, `e` edit, `n` new, `p` pin, `a` archive, `
 
 ## Context rot
 
-Memory that is never pruned eventually crowds out what matters, so a `maintain` job runs with the processor every `maintainEveryHours` (12) and can be triggered from the UI:
+Memory rots in two ways: facts go stale (the code changed, the decision was reversed) and dead weight accumulates. Both are handled.
+
+**At write time — reconciliation.** When a new observation is extracted, its nearest neighbours (by embedding and by shared graph entities) are shown to the model with one question: which of these does the new fact make wrong, and is it merely a duplicate? Superseded memories are archived immediately with `superseded_by` pointing at the replacement (the UI shows the link); a redundant newcomer is folded into the established memory, which gains confidence. Pinned memory is never superseded; hand-written memory is never folded. This is the main defence: a stale fact is retired the moment the correction arrives, not weeks later.
+
+**At read time — relevance gate.** With a real query, only three items that matched by recency alone are allowed in; the rest must have a keyword, semantic, or graph hit. A session with little relevant memory injects less, not the same 2.5k tokens of filler. Every injection also costs an item a little confidence (`beta`) unless it is later marked useful, so memory that keeps being shown without helping sinks.
+
+**Periodically — `maintain` job**, run with the processor every `maintainEveryHours` (12) and triggerable from the UI:
 
 - **Retire** — after `retireAfterDays` (45), observations that were injected 3+ times but never marked useful, or whose confidence fell below 40 %, are archived.
 - **Deduplicate** — near-duplicate observations (embedding cosine ≥ `dedupeThreshold`, 0.92) are folded: the older is archived with `superseded_by` pointing at the newer.

@@ -362,6 +362,7 @@ export function renderPane() {
       <button class="sm" id="p-close" title="Esc">✕</button></div>
     <div class="content">
       <h3>${esc(o.title)}</h3>
+      ${o.superseded_by ? `<div class="amber">Superseded by <a href="#" data-open="${o.superseded_by}">#${o.superseded_by}</a> — a newer memory replaced this one, so it is no longer injected.</div>` : ""}
       ${why}
       <div class="narr">${esc(o.narrative)}</div>
       ${o.facts.length ? `<ul class="facts">${o.facts.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>` : ""}
@@ -375,6 +376,7 @@ export function renderPane() {
   $("#p-edit").onclick = startEdit; $("#p-pin").onclick = () => togglePin(o.id); $("#p-arch").onclick = () => toggleArchive(o.id);
   $("#p-del").onclick = () => deleteOpen(o.id); $("#p-close").onclick = closePane;
   $("#p-up").onclick = () => feedback(o.id, true); $("#p-down").onclick = () => feedback(o.id, false);
+  pane.querySelectorAll("[data-open]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); openDetail(Number(a.dataset.open)); }));
 }
 export function whyChips(w) {
   if (!w) return "";

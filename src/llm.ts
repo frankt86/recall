@@ -77,6 +77,12 @@ function fake(system: string, user: string): string {
       ],
     });
   }
+  if (system.includes("MEMORY_RECONCILER")) {
+    // Test mode: a candidate whose title contains "[stale]" is superseded, one containing "[dup]" is a duplicate.
+    const supersedes = [...user.matchAll(/^#(\d+) .*\[stale\]/gm)].map((m) => Number(m[1]));
+    const dup = user.match(/^#(\d+) .*\[dup\]/m);
+    return JSON.stringify({ supersedes, duplicate_of: dup ? Number(dup[1]) : null });
+  }
   if (system.includes("SESSION_SUMMARIZER")) {
     return JSON.stringify({
       request: "Fake request",
