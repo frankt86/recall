@@ -28,12 +28,6 @@ jobs:
           - os: ubuntu-latest
             target: bun-linux-x64
             artifact: recall-linux-x64
-          - os: macos-latest
-            target: bun-darwin-arm64
-            artifact: recall-darwin-arm64
-          - os: macos-13
-            target: bun-darwin-x64
-            artifact: recall-darwin-x64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
