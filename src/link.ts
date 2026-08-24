@@ -136,7 +136,32 @@ function linkWindows(root: string, e: LinkEnv): LinkResult {
     return { ok: false, action: "skipped", note: `cannot create ${dir}` };
   }
   const fwd = root.replace(/\\/g, "/");
-  const cmd = `@echo off\r\nbash "${fwd}/bin/bun.sh" "${fwd}/src/cli.ts" %*\r\n`;
+  const win = root.replace(/\//g, "\\");
+  // Never invoke bare `bash` from cmd: on many Windows machines it resolves to the WSL stub in
+  // System32 (which fails with "execvpe /bin/bash" when no distro is installed), not Git Bash.
+  // Prefer the plugin's own Bun, then the cached Bun, then an explicitly located Git Bash.
+  const cmd = [
+    "@echo off",
+    `if exist "${win}\\runtime\\bun.exe" (`,
+    `  "${win}\\runtime\\bun.exe" "${win}\\src\\cli.ts" %*`,
+    "  exit /b",
+    ")",
+    `for /d %%D in ("%USERPROFILE%\\.recall\\runtime\\bun-v*") do (`,
+    `  if exist "%%D\\bun.exe" (`,
+    `    "%%D\\bun.exe" "${win}\\src\\cli.ts" %*`,
+    "    exit /b",
+    "  )",
+    ")",
+    `for %%B in ("%ProgramFiles%\\Git\\bin\\bash.exe" "%ProgramFiles(x86)%\\Git\\bin\\bash.exe" "%LocalAppData%\\Programs\\Git\\bin\\bash.exe") do (`,
+    `  if exist "%%~B" (`,
+    `    "%%~B" "${fwd}/bin/bun.sh" "${fwd}/src/cli.ts" %*`,
+    "    exit /b",
+    "  )",
+    ")",
+    "echo recall: no runtime found. Start one Claude Code session (it stages the runtime), or install Git for Windows, then retry.",
+    "exit /b 1",
+    "",
+  ].join("\r\n");
   const sh = `#!/usr/bin/env bash\nexec bash "${fwd}/bin/bun.sh" "${fwd}/src/cli.ts" "$@"\n`;
   let changed = false;
   for (const [name, body] of [["recall.cmd", cmd], ["recall", sh]] as const) {

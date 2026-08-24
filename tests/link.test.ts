@@ -64,6 +64,17 @@ test("refuses to touch a foreign `recall` file", () => {
   expect(readFileSync(join(bin, "recall"), "utf8")).toBe("someone else's tool");
 });
 
+test("windows shim never invokes bare `bash` (WSL stub) and prefers the plugin's bun", () => {
+  const { home, root } = fixture();
+  const r = ensureCliLink(root, { home, platform: "win32", profile: false });
+  expect(r.ok).toBe(true);
+  const cmd = readFileSync(join(home, ".recall", "bin", "recall.cmd"), "utf8");
+  expect(cmd).toContain("runtime\\bun.exe");
+  expect(cmd).toContain("Git\\bin\\bash.exe");
+  for (const line of cmd.split("\r\n")) expect(line.trimStart().startsWith("bash ")).toBe(false);
+  expect(ensureCliLink(root, { home, platform: "win32", profile: false }).action).toBe("unchanged");
+});
+
 test("remove undoes the symlink and the profile line", () => {
   const { home, root } = fixture();
   const e = { home, pathVar: "/usr/bin", shell: "/bin/bash", platform: "linux" as const };
