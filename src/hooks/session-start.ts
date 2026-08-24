@@ -28,4 +28,10 @@ if (ctx.text) {
 }
 db.close();
 if (ctx.pending) spawnProcessor();
-if (ctx.text) process.stdout.write(ctx.text + "\n");
+if (ctx.text) {
+  process.stdout.write(ctx.text + "\n");
+} else {
+  // An empty database and a broken pipeline look identical when the hook is silent, so always say something.
+  const pending = ctx.pending ? ` (${ctx.pending} memory job${ctx.pending === 1 ? "" : "s"} still processing — memories appear once they finish)` : "";
+  process.stdout.write(`recall: no stored memories for ${proj.name} yet${pending}\n`);
+}

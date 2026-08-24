@@ -7,7 +7,7 @@
       ]}
     ],
     "SessionStart": [
-      { "matcher": "startup|clear|compact", "hooks": [
+      { "matcher": "startup|resume|clear|compact", "hooks": [
         { "type": "command", "command": "bash \"$CLAUDE_PLUGIN_ROOT/bin/bun.sh\" \"$CLAUDE_PLUGIN_ROOT/src/hooks/session-start.ts\"", "timeout": 30 }
       ]}
     ],

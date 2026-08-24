@@ -54,6 +54,8 @@ PostToolUse       -> redact, filter sensitive paths, append event row       (asy
 Stop              -> close prompt, enqueue observe, spawn processor (detached)
 SessionEnd        -> enqueue summarize, spawn processor
 SessionStart      -> retrieve with budget, print context, spawn processor if backlog
+                     (fires on startup, resume, clear and compact; when there is nothing
+                      to inject yet it prints a one-line status instead of staying silent)
 
 processor.ts      -> acquire lock row; UPDATE ... RETURNING to claim a job;
                      observe: events for one prompt -> 1 LLM call -> 1..4 observations + embeddings

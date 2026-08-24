@@ -19,7 +19,7 @@ async function hook(name: string, input: object): Promise<string> {
 
 test("hooks -> queue -> processor -> context", async () => {
   const base = { session_id: "sess-1", cwd: dir + "/repo" };
-  expect(await hook("session-start", base)).toBe("");
+  expect(await hook("session-start", base)).toContain("no stored memories for terry/demo yet");
   await hook("user-prompt", { ...base, prompt: "Fix the login redirect loop in auth middleware" });
   await hook("post-tool-use", { ...base, tool_name: "Read", tool_input: { file_path: "src/auth.ts" }, tool_response: "export function auth() {}" });
   await hook("post-tool-use", { ...base, tool_name: "Read", tool_input: { file_path: ".env" }, tool_response: "SECRET=abc" });
