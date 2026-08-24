@@ -7,7 +7,7 @@ import { markUnhelpful, markUsed, retrieve } from "./retrieve";
 import { openBrowser, startUi } from "./ui/server";
 
 const db = openDb();
-const server = new McpServer({ name: "recall", version: "0.3.0" });
+const server = new McpServer({ name: "recall", version: "0.4.0" });
 
 function projectIdFor(project?: string): string {
   if (project) {

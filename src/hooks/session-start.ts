@@ -5,7 +5,19 @@ guardInternal();
 import { recentFilesQuery, resolveProject } from "../project";
 import { markShown } from "../retrieve";
 import { buildSessionContext } from "../context";
-import { loadSettings } from "../settings";
+import { ensureCliLink } from "../link";
+import { env, loadSettings } from "../settings";
+import { pluginRoot } from "../hook-io";
+
+// Keep the `recall` terminal command working across plugin updates/moves. Repair-only
+// (profile: false): creating PATH entries is reserved for the Setup hook's `recall link`.
+if (env("NO_LINK") !== "1") {
+  try {
+    ensureCliLink(pluginRoot(), { profile: false });
+  } catch {
+    // never let PATH maintenance break context injection
+  }
+}
 
 const input = await readHookInput();
 const db = openDb();

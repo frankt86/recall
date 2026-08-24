@@ -76,11 +76,9 @@ With `ANTHROPIC_API_KEY` set the processor calls the Messages API with Haiku. Wi
 
 ## CLI
 
-Installing the plugin does **not** put `recall` on your shell's PATH (nothing touches your profile, by design). You get the CLI three ways:
+Installing the plugin puts `recall` on your PATH automatically: the Setup hook runs `recall link`, which symlinks `bin/recall` into a writable directory already on your PATH (`~/.local/bin`, `~/bin`, `/opt/homebrew/bin`, `/usr/local/bin`); if none exists it creates `~/.local/bin` and adds one guarded `export PATH=...` line to your `~/.zshrc`/`~/.bashrc` (marked, added once, removed by `recall link --remove`). On Windows it writes shims to `%USERPROFILE%\.recall\bin` and adds that to your user PATH. Open a new terminal after installing. SessionStart repairs a stale link after plugin updates (symlink only, never profiles); `RECALL_NO_LINK=1` disables that, `recall link --remove` undoes everything, and a `recall` that isn't ours is never overwritten.
 
-- **Ask Claude.** "Open the recall UI" calls the MCP `open_ui` tool (or the `recall-ui` skill) — no terminal needed. Inside Claude Code's Bash tool, `recall <command>` also works: the plugin's `bin/` is on that PATH while the plugin is enabled.
-- **Symlink it for your terminal:** `ln -s <plugin-dir>/bin/recall ~/.local/bin/recall` (find the plugin dir under `~/.claude/plugins`). `bin/recall` resolves Bun via `bin/bun.sh`, so no global Bun install is needed.
-- **Run it in place:** `bash <plugin-dir>/bin/recall <command>` or `bun src/cli.ts <command>` from a checkout.
+You can also skip the terminal entirely: asking Claude to "open the recall UI" calls the MCP `open_ui` tool, and inside Claude Code's Bash tool `recall <command>` always works (the plugin's `bin/` is on that PATH).
 
 Every command has `--help`; bad flags exit 2 with usage, runtime errors exit 1 with a one-line `error:` (stack with `RECALL_DEBUG=1`).
 

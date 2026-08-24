@@ -5,13 +5,14 @@ import { levenshtein, parseCommand, UsageError, usage, type CommandSpec } from "
 import { consolidate } from "./commands/consolidate";
 import { doctor } from "./commands/doctor";
 import { exportCmd } from "./commands/export";
+import { link } from "./commands/link";
 import { migrate } from "./commands/migrate";
 import { processCmd } from "./commands/process";
 import { relink } from "./commands/relink";
 import { status } from "./commands/status";
 import { ui } from "./commands/ui";
 
-const COMMANDS: CommandSpec<any>[] = [status, processCmd, exportCmd, migrate, relink, consolidate, ui, doctor];
+const COMMANDS: CommandSpec<any>[] = [status, processCmd, exportCmd, migrate, relink, consolidate, ui, link, doctor];
 
 function version(): string {
   return (pkg as { version: string }).version;

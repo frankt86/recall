@@ -3,7 +3,7 @@
   "hooks": {
     "Setup": [
       { "matcher": "*", "hooks": [
-        { "type": "command", "command": "cd \"$CLAUDE_PLUGIN_ROOT\" && bash \"$CLAUDE_PLUGIN_ROOT/bin/bun.sh\" install --silent --production >/dev/null 2>&1; bash \"$CLAUDE_PLUGIN_ROOT/bin/bun.sh\" \"$CLAUDE_PLUGIN_ROOT/src/cli.ts\" doctor", "timeout": 300 }
+        { "type": "command", "command": "cd \"$CLAUDE_PLUGIN_ROOT\" && bash \"$CLAUDE_PLUGIN_ROOT/bin/bun.sh\" install --silent --production >/dev/null 2>&1; bash \"$CLAUDE_PLUGIN_ROOT/bin/bun.sh\" \"$CLAUDE_PLUGIN_ROOT/src/cli.ts\" link; bash \"$CLAUDE_PLUGIN_ROOT/bin/bun.sh\" \"$CLAUDE_PLUGIN_ROOT/src/cli.ts\" doctor", "timeout": 300 }
       ]}
     ],
     "SessionStart": [
