@@ -7,7 +7,7 @@ mkdirSync(dir, { recursive: true });
 mkdirSync(dir + "/repo/.git", { recursive: true });
 writeFileSync(dir + "/repo/.git/HEAD", "ref: refs/heads/feature/x\n");
 writeFileSync(dir + "/repo/.git/config", '[remote "origin"]\n\turl = git@github.com:terry/demo.git\n');
-const env = { ...process.env, RECALL_DIR: dir, RECALL_LLM: "fake", RECALL_EMBEDDINGS: "0", RECALL_NO_SPAWN: "1" };
+const env = { ...process.env, RECALL_DIR: dir, RECALL_LLM: "fake", RECALL_EMBEDDINGS: "0", RECALL_NO_SPAWN: "1", RECALL_NO_LINK: "1" };
 
 async function hook(name: string, input: object): Promise<string> {
   const p = Bun.spawn(["bun", `src/hooks/${name}.ts`], { stdin: new Blob([JSON.stringify(input)]), stdout: "pipe", stderr: "pipe", env });

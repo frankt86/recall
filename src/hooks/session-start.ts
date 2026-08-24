@@ -6,14 +6,21 @@ import { recentFilesQuery, resolveProject } from "../project";
 import { markShown } from "../retrieve";
 import { buildSessionContext } from "../context";
 import { ensureCliLink } from "../link";
-import { env, loadSettings } from "../settings";
+import { dataDir, env, loadSettings } from "../settings";
 import { pluginRoot } from "../hook-io";
+import { existsSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
-// Keep the `recall` terminal command working across plugin updates/moves. Repair-only
-// (profile: false): creating PATH entries is reserved for the Setup hook's `recall link`.
+// Claude Code's Setup event never fires on plugin installs (it is a CI/--init-only thing), so the
+// first SessionStart does the install-time work: a full `recall link` (which may add one guarded
+// PATH line to the shell profile), recorded in a marker file. Every later session is repair-only
+// (profile: false) so a user who deletes the profile line never has it silently re-added.
 if (env("NO_LINK") !== "1") {
   try {
-    ensureCliLink(pluginRoot(), { profile: false });
+    const done = join(dataDir(), ".cli-linked");
+    const first = !existsSync(done);
+    const r = ensureCliLink(pluginRoot(), first ? {} : { profile: false });
+    if (first && r.ok) writeFileSync(done, r.dir ?? "");
   } catch {
     // never let PATH maintenance break context injection
   }

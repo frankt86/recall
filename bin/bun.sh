@@ -124,6 +124,9 @@ lock() {
   trap 'rm -rf "$LOCKDIR"' EXIT
 }
 
+# `exec bun` at the bottom never runs EXIT traps, so release the lock explicitly.
+unlock() { rm -rf "$LOCKDIR"; trap - EXIT; }
+
 download() {
   [ "${RECALL_NO_DOWNLOAD:-}" = 1 ] && die "bun not found and RECALL_NO_DOWNLOAD=1. Install Bun (https://bun.sh) or set RECALL_BUN."
   local target sha zip tmp
@@ -132,7 +135,7 @@ download() {
   [ -n "$sha" ] || die "no pinned checksum for platform $target. Install Bun manually (https://bun.sh) or set RECALL_BUN."
   lock
   # Another process may have finished while we waited.
-  [ -x "$CACHE/bun$EXE" ] && return 0
+  [ -x "$CACHE/bun$EXE" ] && { unlock; return 0; }
   tmp="$DATA/runtime/.tmp-$$"
   rm -rf "$tmp"; mkdir -p "$tmp"
   zip="$tmp/bun-$target.zip"
@@ -149,6 +152,7 @@ download() {
   rm -rf "$CACHE"; mv "$CACHE.new" "$CACHE"
   rm -rf "$tmp"
   log "installed bun v$PIN"
+  unlock
 }
 
 mirror() {  # copy/link the resolved bun into the plugin so .mcp.json can launch it without a shell

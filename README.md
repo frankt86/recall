@@ -32,7 +32,7 @@ or point Claude Code at the directory:
 claude --plugin-dir /path/to/recall
 ```
 
-The Setup hook bootstraps the runtime, runs `bun install`, then `doctor`. Restart Claude Code.
+Restart Claude Code after installing. The **first session** bootstraps everything (Bun runtime, dependencies, the `recall` PATH link) via the SessionStart hook — Claude Code has no install-time hook, so nothing runs until a session starts. The MCP server (and its `open_ui` tool) comes up from the **second session** onward, once the first session's hooks have populated `runtime/`.
 
 ## Runtime
 
@@ -44,7 +44,7 @@ Everything (hooks, MCP server, CLI) runs on Bun. `bin/bun.sh` resolves one witho
 4. `bun` on PATH (or `~/.bun/bin`) if it is >= 1.1
 5. Download the pinned release zip from GitHub, verify its SHA-256 against checksums embedded in the script, and install into 3
 
-Installs are atomic and locked against concurrently firing hooks. Set `RECALL_NO_DOWNLOAD=1` to fail instead of downloading, `RECALL_BUN_TARGET` to override platform detection (e.g. `linux-x64-baseline`). `recall doctor` reports which Bun is in use. With `--plugin-dir` (no Setup hook) the MCP server starts on the second session, after the first session's hooks have populated `runtime/`; run `bash bin/bun.sh --ensure` to do it immediately.
+Installs are atomic and locked against concurrently firing hooks. Set `RECALL_NO_DOWNLOAD=1` to fail instead of downloading, `RECALL_BUN_TARGET` to override platform detection (e.g. `linux-x64-baseline`). `recall doctor` reports which Bun is in use. On any install, the MCP server starts on the second session, after the first session's hooks have populated `runtime/`; run `bash bin/bun.sh --ensure` to do it immediately.
 
 ## How it runs
 
@@ -76,7 +76,7 @@ With `ANTHROPIC_API_KEY` set the processor calls the Messages API with Haiku. Wi
 
 ## CLI
 
-Installing the plugin puts `recall` on your PATH automatically: the Setup hook runs `recall link`, which symlinks `bin/recall` into a writable directory already on your PATH (`~/.local/bin`, `~/bin`, `/opt/homebrew/bin`, `/usr/local/bin`); if none exists it creates `~/.local/bin` and adds one guarded `export PATH=...` line to your `~/.zshrc`/`~/.bashrc` (marked, added once, removed by `recall link --remove`). On Windows it writes shims to `%USERPROFILE%\.recall\bin` and adds that to your user PATH. Open a new terminal after installing. SessionStart repairs a stale link after plugin updates (symlink only, never profiles); `RECALL_NO_LINK=1` disables that, `recall link --remove` undoes everything, and a `recall` that isn't ours is never overwritten.
+Installing the plugin puts `recall` on your PATH automatically: the first session start runs `recall link`, which symlinks `bin/recall` into a writable directory already on your PATH (`~/.local/bin`, `~/bin`, `/opt/homebrew/bin`, `/usr/local/bin`); if none exists it creates `~/.local/bin` and adds one guarded `export PATH=...` line to your `~/.zshrc`/`~/.bashrc` (marked, added once, removed by `recall link --remove`). On Windows it writes shims to `%USERPROFILE%\.recall\bin` and adds that to your user PATH. Open a new terminal after installing. SessionStart repairs a stale link after plugin updates (symlink only, never profiles); `RECALL_NO_LINK=1` disables that, `recall link --remove` undoes everything, and a `recall` that isn't ours is never overwritten.
 
 You can also skip the terminal entirely: asking Claude to "open the recall UI" calls the MCP `open_ui` tool, and inside Claude Code's Bash tool `recall <command>` always works (the plugin's `bin/` is on that PATH).
 
