@@ -1,11 +1,6 @@
 {
   "description": "recall hooks. bin/bun.sh resolves (or downloads a pinned, checksum-verified) Bun. Every hook is a short SQLite write; the processor is spawned detached and exits when the queue is empty.",
   "hooks": {
-    "Setup": [
-      { "matcher": "*", "hooks": [
-        { "type": "command", "command": "cd \"$CLAUDE_PLUGIN_ROOT\" && bash \"$CLAUDE_PLUGIN_ROOT/bin/bun.sh\" install --silent --production >/dev/null 2>&1; bash \"$CLAUDE_PLUGIN_ROOT/bin/bun.sh\" \"$CLAUDE_PLUGIN_ROOT/src/cli.ts\" link; bash \"$CLAUDE_PLUGIN_ROOT/bin/bun.sh\" \"$CLAUDE_PLUGIN_ROOT/src/cli.ts\" doctor", "timeout": 300 }
-      ]}
-    ],
     "SessionStart": [
       { "matcher": "startup|resume|clear|compact", "hooks": [
         { "type": "command", "command": "bash \"$CLAUDE_PLUGIN_ROOT/bin/bun.sh\" \"$CLAUDE_PLUGIN_ROOT/src/hooks/session-start.ts\"", "timeout": 30 }
