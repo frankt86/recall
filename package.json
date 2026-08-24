@@ -1,6 +1,6 @@
 {
   "name": "recall",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "Daemonless persistent memory for Claude Code. SQLite is the bus, no ports, no worker.",
   "license": "Apache-2.0",
   "type": "module",

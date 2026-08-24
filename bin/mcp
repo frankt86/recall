@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# MCP server entry point (POSIX). Committed to git so it exists the moment a plugin
+# update lands — unlike runtime/bun, which is only staged by hooks. bun.sh resolves
+# the cached Bun (which survives plugin updates), so the server starts on the first
+# session after an update instead of failing until the runtime is re-mirrored.
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec bash "$here/bun.sh" "$here/../src/mcp-launch.ts"

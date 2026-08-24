@@ -2,10 +2,8 @@
   "mcpServers": {
     "recall": {
       "type": "stdio",
-      "command": "${CLAUDE_PLUGIN_ROOT}/runtime/bun",
-      "args": [
-        "${CLAUDE_PLUGIN_ROOT}/src/mcp-launch.ts"
-      ]
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/mcp",
+      "args": []
     }
   }
 }

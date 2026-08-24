@@ -32,7 +32,7 @@ or point Claude Code at the directory:
 claude --plugin-dir /path/to/recall
 ```
 
-Restart Claude Code after installing. The **first session** bootstraps everything (Bun runtime, dependencies, the `recall` PATH link) via the SessionStart hook — Claude Code has no install-time hook, so nothing runs until a session starts. The MCP server (and its `open_ui` tool) comes up from the **second session** onward, once the first session's hooks have populated `runtime/`.
+Restart Claude Code after installing. The **first session** bootstraps everything (Bun runtime, dependencies, the `recall` PATH link) via the SessionStart hook — Claude Code has no install-time hook, so nothing runs until a session starts. The MCP server launches through `bin/mcp`, which finds a Bun runtime wherever one lives (the `~/.recall` cache, PATH, or by downloading the pinned build), so it survives plugin updates; only a machine that has never resolved Bun at all may need its very first session to finish before the server connects.
 
 ## Runtime
 
@@ -44,7 +44,7 @@ Everything (hooks, MCP server, CLI) runs on Bun. `bin/bun.sh` resolves one witho
 4. `bun` on PATH (or `~/.bun/bin`) if it is >= 1.1
 5. Download the pinned release zip from GitHub, verify its SHA-256 against checksums embedded in the script, and install into 3
 
-Installs are atomic and locked against concurrently firing hooks. Set `RECALL_NO_DOWNLOAD=1` to fail instead of downloading, `RECALL_BUN_TARGET` to override platform detection (e.g. `linux-x64-baseline`). `recall doctor` reports which Bun is in use. On any install, the MCP server starts on the second session, after the first session's hooks have populated `runtime/`; run `bash bin/bun.sh --ensure` to do it immediately.
+Installs are atomic and locked against concurrently firing hooks. Set `RECALL_NO_DOWNLOAD=1` to fail instead of downloading, `RECALL_BUN_TARGET` to override platform detection (e.g. `linux-x64-baseline`). `recall doctor` reports which Bun is in use. The MCP server starts through `bin/mcp` (`bin/mcp.cmd` on Windows), which resolves Bun via this same chain — plugin updates land in a fresh directory with an empty `runtime/`, and the cached Bun in `~/.recall` keeps the server starting on the first session after every update.
 
 ## How it runs
 
