@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Stable `recall` entry point: runs the CLI via the plugin's own Bun (bin/bun.sh).
+# Claude Code puts this bin/ on the Bash tool's PATH while the plugin is enabled;
+# for your own terminal, symlink it: ln -s "$(pwd)/bin/recall" ~/.local/bin/recall
+set -euo pipefail
+src="${BASH_SOURCE[0]}"
+while [ -L "$src" ]; do
+  dir="$(cd -P "$(dirname "$src")" && pwd)"
+  src="$(readlink "$src")"
+  case "$src" in /*) ;; *) src="$dir/$src" ;; esac
+done
+here="$(cd -P "$(dirname "$src")" && pwd)"
+exec bash "$here/bun.sh" "$here/../src/cli.ts" "$@"

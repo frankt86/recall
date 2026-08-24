@@ -76,7 +76,13 @@ With `ANTHROPIC_API_KEY` set the processor calls the Messages API with Haiku. Wi
 
 ## CLI
 
-`recall` (or `bun src/cli.ts`) — every command has `--help`; bad flags exit 2 with usage, runtime errors exit 1 with a one-line `error:` (stack with `RECALL_DEBUG=1`).
+Installing the plugin does **not** put `recall` on your shell's PATH (nothing touches your profile, by design). You get the CLI three ways:
+
+- **Ask Claude.** "Open the recall UI" calls the MCP `open_ui` tool (or the `recall-ui` skill) — no terminal needed. Inside Claude Code's Bash tool, `recall <command>` also works: the plugin's `bin/` is on that PATH while the plugin is enabled.
+- **Symlink it for your terminal:** `ln -s <plugin-dir>/bin/recall ~/.local/bin/recall` (find the plugin dir under `~/.claude/plugins`). `bin/recall` resolves Bun via `bin/bun.sh`, so no global Bun install is needed.
+- **Run it in place:** `bash <plugin-dir>/bin/recall <command>` or `bun src/cli.ts <command>` from a checkout.
+
+Every command has `--help`; bad flags exit 2 with usage, runtime errors exit 1 with a one-line `error:` (stack with `RECALL_DEBUG=1`).
 
 ```
 recall status [--json]                   counts, queue, stuck/failed jobs, projects
@@ -89,7 +95,7 @@ recall ui [--port n] [--open]            memory manager web app, exits with the 
 recall doctor [--json]                   environment check, exit 1 on failure
 ```
 
-`ui` binds 127.0.0.1 on an ephemeral port only while the command runs. It is a full memory manager, not just a viewer — everything that ends up in Claude's context can be edited, pinned, excluded, merged, or written by hand:
+`ui` binds 127.0.0.1 on an ephemeral port only while the command runs (asking Claude to "open the recall UI" starts the same server inside the MCP process; it stops with the session). It is a full memory manager, not just a viewer — everything that ends up in Claude's context can be edited, pinned, excluded, merged, or written by hand:
 
 - **Inbox / All / Pinned / Archived** — list views with hybrid FTS + vector search, type filter, sort. Inbox shows what arrived since your last visit.
 - **Detail pane** — edit title / narrative / facts / files / type / project in place, pin, archive, delete, vote 👍/👎 (same alpha/beta update as the MCP `feedback` tool).

@@ -4,9 +4,10 @@ import { z } from "zod";
 import { openDb, type ObservationRow } from "./db";
 import { resolveProject } from "./project";
 import { markUnhelpful, markUsed, retrieve } from "./retrieve";
+import { openBrowser, startUi } from "./ui/server";
 
 const db = openDb();
-const server = new McpServer({ name: "recall", version: "0.2.1" });
+const server = new McpServer({ name: "recall", version: "0.3.0" });
 
 function projectIdFor(project?: string): string {
   if (project) {
@@ -141,6 +142,21 @@ server.tool(
       .all();
     const text = rows.map((r) => `${r.name}  (${r.id})  ${r.n} obs${r.last ? "  last " + fmtDate(r.last) : ""}`).join("\n");
     return { content: [{ type: "text", text: text || "No projects yet." }] };
+  },
+);
+
+let ui: { port: number; stop: () => void } | null = null;
+server.tool(
+  "open_ui",
+  "Start the recall memory-manager web app on 127.0.0.1 and return its URL. No setup needed; runs until this Claude Code session ends. Idempotent: calling again returns the URL of the already-running viewer. Use when the user asks to open, see, or manage their memory UI.",
+  { open_browser: z.boolean().optional().describe("Also open the URL in the default browser (default true)") },
+  async ({ open_browser }) => {
+    if (!ui) ui = startUi(db, 0);
+    const url = `http://127.0.0.1:${ui.port}/`;
+    const opened = open_browser === false ? false : openBrowser(url);
+    return {
+      content: [{ type: "text", text: `recall UI running at ${url}${opened ? " (opened in browser)" : ""} — it stops when this Claude Code session ends. Give this URL to the user.` }],
+    };
   },
 );
 

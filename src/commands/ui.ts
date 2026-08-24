@@ -1,5 +1,5 @@
 import { openDb } from "../db";
-import { startUi } from "../ui/server";
+import { openBrowser, startUi } from "../ui/server";
 import { portOption, type CommandSpec } from "./args";
 
 export const ui: CommandSpec<{ port?: string; open?: boolean }> = {
@@ -21,14 +21,7 @@ export const ui: CommandSpec<{ port?: string; open?: boolean }> = {
     }
     const url = `http://127.0.0.1:${srv.port}/`;
     console.log(`viewer: ${url}  (ctrl-c to stop; nothing listens when this exits)`);
-    if (o.open) {
-      const cmd = process.platform === "win32" ? ["cmd", "/c", "start", "", url] : process.platform === "darwin" ? ["open", url] : ["xdg-open", url];
-      try {
-        Bun.spawn(cmd, { stdio: ["ignore", "ignore", "ignore"], windowsHide: true }).unref();
-      } catch {
-        console.log("could not open browser automatically");
-      }
-    }
+    if (o.open && !openBrowser(url)) console.log("could not open browser automatically");
     const stop = () => {
       srv.stop();
       db.close();

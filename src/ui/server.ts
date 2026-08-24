@@ -29,6 +29,16 @@ export function buildRouter(): Router {
   return r;
 }
 
+export function openBrowser(url: string): boolean {
+  const cmd = process.platform === "win32" ? ["cmd", "/c", "start", "", url] : process.platform === "darwin" ? ["open", url] : ["xdg-open", url];
+  try {
+    Bun.spawn(cmd, { stdio: ["ignore", "ignore", "ignore"], windowsHide: true }).unref();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function startUi(db: Database, port: number): { port: number; stop: () => void } {
   const router = buildRouter();
   const server = Bun.serve({
