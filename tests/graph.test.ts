@@ -108,3 +108,21 @@ test("maintenance retires stale unhelpful memory, dedupes, caps, prunes graph; p
   expect(lastMaintenance(db)!.at).toBe(stats.at);
   expect(graph(db, "p1").nodes.some((n) => n.name.startsWith("Stale"))).toBe(false);
 });
+
+test("graphSkeleton renders top entities and named relations for the digest prompt", async () => {
+  const { linkObservation, graphSkeleton } = await import("../src/graph");
+  // Fresh project so earlier tests' maintenance/archiving doesn't interfere.
+  const { now } = await import("../src/db");
+  db.query("INSERT OR IGNORE INTO projects(id, name, root_path, remote, created_at) VALUES ('p2','demo2','/d2',NULL,?)").run(now());
+  for (let i = 0; i < 3; i++) {
+    const id = ins({ project: "p2", title: `Auth work ${i}`, narrative: "`login()` lives in `src/auth.ts` and uses the sessions table.", files: ["src/auth.ts"] });
+    linkObservation(db, row(id), [{ name: "sessions", kind: "concept" }], [{ from: "login", to: "src/auth.ts", rel: "defines" }]);
+  }
+  const s = graphSkeleton(db, "p2");
+  expect(s).toContain("TOP ENTITIES");
+  expect(s).toContain("[file] src/auth.ts (3 mentions)");
+  expect(s).toContain("RELATIONS:");
+  expect(s).toContain("login defines src/auth.ts");
+  expect(s).not.toContain("co_occurs");
+  expect(graphSkeleton(db, "no-such-project")).toBe("");
+});

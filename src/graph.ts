@@ -174,6 +174,22 @@ export function graphHits(db: Database, projectId: string, query: string, includ
   return rows.map((r) => r.id);
 }
 
+// Compact text rendering of the graph for LLM prompts (digest consolidation): the most-mentioned
+// entities and their strongest relations, so the model gets a data-driven skeleton of what matters
+// long-term instead of inferring it from prose. Empty string when the graph has nothing significant.
+export function graphSkeleton(db: Database, projectId: string, opts: { entities?: number; relations?: number } = {}): string {
+  const { nodes, edges } = graph(db, projectId, { minMentions: 2, limit: opts.entities ?? 25 });
+  if (!nodes.length) return "";
+  const name = new Map(nodes.map((n) => [n.id, n.name]));
+  const lines = nodes.map((n) => `- [${n.kind}] ${n.name} (${n.mentions} mentions)`);
+  const rels = edges
+    .filter((e) => e.rel !== "co_occurs" && name.has(e.src) && name.has(e.dst))
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, opts.relations ?? 20)
+    .map((e) => `- ${name.get(e.src)} ${e.rel} ${name.get(e.dst)}`);
+  return ["TOP ENTITIES (from active memory):", ...lines, ...(rels.length ? ["RELATIONS:", ...rels] : [])].join("\n");
+}
+
 // Drop entities no longer attached to active memory (and older than `graceMs`); decay edge weights and drop the faint ones.
 export function pruneGraph(db: Database, opts: { graceMs: number; decay: number; minWeight?: number }): { entities: number; edges: number } {
   const cutoff = now() - opts.graceMs;

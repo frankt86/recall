@@ -17,7 +17,7 @@ import {
   type ObservationRow,
 } from "./db";
 import { cosine, embed } from "./embed";
-import { linkObservation, type EntityIn, type RelationIn } from "./graph";
+import { graphSkeleton, linkObservation, type EntityIn, type RelationIn } from "./graph";
 import { runMaintain } from "./maintain";
 import { complete, extractJson } from "./llm";
 import { env, loadSettings } from "./settings";
@@ -48,7 +48,7 @@ You receive one NEW observation and a few EXISTING observations about the same c
 When unsure, leave lists empty. Respond with ONLY a JSON object: {"supersedes":[ids],"duplicate_of":id|null}`;
 
 const DIGEST_SYSTEM = `You are DIGEST_WRITER for a developer memory system.
-You receive many older observations from one project over a period. Write a dense project digest in markdown (max 400 words): architecture facts, standing decisions, recurring gotchas, file map. Drop transient details. No preamble.`;
+You receive many older observations from one project over a period, and a knowledge-graph skeleton of the project's most-mentioned entities and their relations. Write a dense project digest in markdown (max 400 words): architecture facts, standing decisions, recurring gotchas, file map. Ground the file map and architecture facts in the graph skeleton — it reflects what active memory actually touches — rather than inferring them from prose alone. Drop transient details. No preamble.`;
 
 interface ObsOut {
   observations: Array<{ type?: string; title: string; narrative: string; facts?: string[]; files?: string[]; importance?: number; entities?: EntityIn[]; relations?: RelationIn[] }>;
@@ -335,8 +335,10 @@ async function runConsolidate(db: Database): Promise<void> {
     const prior = db
       .query<{ content: string }, [string]>("SELECT content FROM digests WHERE project_id = ? ORDER BY period_end DESC LIMIT 1")
       .get(p.project_id);
+    const skeleton = graphSkeleton(db, p.project_id);
     const user = [
       prior ? `PREVIOUS DIGEST (fold into the new one):\n${prior.content}\n` : "",
+      skeleton ? `${skeleton}\n` : "",
       "OBSERVATIONS:",
       ...old.map((o) => `- [${new Date(o.created_at).toISOString().slice(0, 10)}] [${o.type}] ${o.title}: ${trunc(o.narrative, 400)}`),
     ].join("\n");
